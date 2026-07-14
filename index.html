@@ -2,504 +2,257 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>遺伝・減数分裂シミュレーター（100回受精機能付き）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>等速円運動 WebAR教材</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
     <style>
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f5f7fa;
-            color: #333;
             margin: 0;
-            padding: 20px;
-        }
-        h1 { text-align: center; color: #2c3e50; }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .section-title {
-            border-left: 5px solid #3498db;
-            padding-left: 10px;
-            margin-top: 30px;
-            color: #2c3e50;
-        }
-        
-        .legend-area {
-            background-color: #fff9db;
-            border: 2px solid #f1c40f;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 25px;
-            display: flex;
-            justify-content: flex-start;
-            align-items: center;
-            gap: 40px;
-        }
-        .legend-item { display: flex; align-items: center; gap: 10px; font-size: 16px; }
-
-        .setup-area {
-            background-color: #eef2f3;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        select { font-size: 16px; padding: 5px 10px; margin: 0 10px; }
-
-        /* シミュレーションエリア */
-        .flex-box {
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            margin-top: 20px;
-        }
-        .cell-box {
-            border: 2px dashed #bdc3c7;
-            background-color: #fafafa;
-            border-radius: 10px;
-            width: 220px;
-            min-height: 120px;
-            padding: 10px;
-            text-align: center;
-            box-sizing: border-box;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            position: relative;
-        }
-        
-        .sperm-box { border-radius: 50% 50% 50% 10%; transform: rotate(-45deg); width: 100px; min-height: 100px; margin: 10px auto; }
-        .sperm-box * { transform: rotate(45deg); }
-        .egg-box { border-radius: 50%; width: 110px; min-height: 110px; margin: 10px auto; }
-        
-        .cell-label {
-            position: absolute;
-            bottom: -25px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        .sperm-label-fix { transform: rotate(45deg); bottom: 5px; left: 5px; }
-
-        /* 染色体（棒状）のデザイン */
-        .chromosome {
-            display: inline-block;
-            width: 30px;
-            height: 70px;
-            border-radius: 15px;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
-            line-height: 70px;
-            text-align: center;
-            cursor: grab;
-            box-shadow: 0 4px 4px rgba(0,0,0,0.2);
+            overflow: hidden;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
             user-select: none;
-            z-index: 10;
         }
-        .chrom-small { width: 16px; height: 40px; border-radius: 8px; font-size: 11px; line-height: 40px; box-shadow: 0 2px 2px rgba(0,0,0,0.2); cursor: default; }
-        .chrom-large { width: 40px; height: 90px; border-radius: 20px; font-size: 24px; line-height: 90px; }
-        .gene-A { background: linear-gradient(135deg, #ff7675, #d63031); }
-        .gene-a { background: linear-gradient(135deg, #74b9ff, #0984e3); }
-
-        #law-notification {
-            display: none;
-            background-color: #e8f4fd;
-            border: 2px solid #3498db;
-            color: #2980b9;
+        /* ARコントロールUI層 */
+        #ui-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.9);
             padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-            margin: 20px 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 10;
+            box-sizing: border-box;
         }
-
-        /* 受精エリア */
-        #fertilization-area {
-            text-align: center;
-            margin: 30px 0;
-            padding: 20px;
-            background-color: #f1f2f6;
-            border-radius: 10px;
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
         }
         button {
-            font-size: 18px;
-            padding: 10px 25px;
-            background-color: #2ecc71;
-            color: white;
+            flex: 1;
+            padding: 8px;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: 0.2s;
-            margin: 5px;
-        }
-        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
-        button:hover:not(:disabled) { background-color: #27ae60; }
-        
-        /* 100回ボタン専用の色（深めの緑） */
-        .bulk-btn { background-color: #16a085; }
-        .bulk-btn:hover:not(:disabled) { background-color: #117a65; }
-        
-        .reset-btn { background-color: #e74c3c; }
-        .reset-btn:hover { background-color: #c0392b; }
-
-        /* 全組み合わせ表示テーブル */
-        .matrix-container {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-        .matrix-table { border-collapse: collapse; background: white; }
-        .matrix-table th, .matrix-table td {
-            border: 2px solid #ccc; width: 140px; height: 120px; text-align: center; font-size: 15px; position: relative; vertical-align: middle;
-        }
-        .matrix-table th { background-color: #dfe6e9; height: 50px;}
-        .chrom-pair-box { display: flex; justify-content: center; gap: 8px; margin-top: 5px; }
-
-        .highlight-zygote {
-            border: 5px solid #f1c40f !important;
-            background-color: #fff9db !important;
-            box-shadow: 0 0 20px #f1c40f;
+            border-radius: 6px;
+            background-color: #007bff;
+            color: white;
             font-weight: bold;
+            cursor: pointer;
         }
-
-        /* 統計カウンターエリア */
-        .stats-area {
+        button:active {
+            background-color: #0056b3;
+        }
+        .slider-group {
+            margin-bottom: 8px;
+        }
+        .slider-label {
             display: flex;
-            justify-content: space-around;
-            background-color: #ffffff;
-            border: 2px solid #2ecc71;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 4px;
         }
-        .stats-card { text-align: center; flex: 1; }
-        .stats-card h4 { margin: 0 0 10px 0; color: #2c3e50; }
-        .counter-table { width: 90%; margin: 0 auto; border-collapse: collapse; }
-        .counter-table th, .counter-table td { border: 1px solid #ddd; padding: 8px; font-size: 15px; }
-        .counter-table th { background-color: #f9f9f9; }
-        .ratio-output { margin-top: 10px; font-weight: bold; color: #27ae60; font-size: 16px; }
+        input[type="range"] {
+            width: 100%;
+        }
+        /* 数値表示パネル */
+        #data-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 10;
+            pointer-events: none;
+            line-height: 1.5;
+        }
+        .text-orange { color: #ff9f43; }
+        .text-cyan { color: #00d2d3; }
+        .text-red { color: #ff6b6b; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>遺伝の法則学習シミュレーター（100回受精機能付き）</h1>
-    
-    <div class="legend-area">
-        <div style="font-weight: bold; color: #d35400; font-size: 18px;">🧬 遺伝子のルール:</div>
-        <div class="legend-item">
-            <div class="chromosome chrom-small gene-A"></div>
-            <strong>遺伝子 A（優性）：</strong> 丸型（赤色の染色体）
-        </div>
-        <div class="legend-item">
-            <div class="chromosome chrom-small gene-a"></div>
-            <strong>遺伝子 a（劣性）：</strong> しわ型（青色の染色体）
-        </div>
+    <div id="data-panel">
+        <div>半径 r : <span id="val-r" class="text-orange">1.00</span> m</div>
+        <div>角速度 ω : <span id="val-omega" class="text-orange">1.50</span> rad/s</div>
+        <div>速度 v : <span id="val-v" class="text-cyan">1.50</span> m/s</div>
+        <div>向心加速度 a_c : <span id="val-ac" class="text-red">2.25</span> m/s²</div>
+        <div>周期 T : <span id="val-t">4.19</span> s</div>
     </div>
 
-    <div class="setup-area">
-        <label><strong>父親(精子)の遺伝子型:</strong></label>
-        <select id="father-select" onchange="resetAll()">
-            <option value="Aa" selected>Aa（丸型・雑種）</option>
-            <option value="AA">AA（丸型・純系）</option>
-            <option value="aa">aa（しわ型・純系）</option>
-        </select>
-
-        <label style="margin-left: 20px;"><strong>母親(卵)の遺伝子型:</strong></label>
-        <select id="mother-select" onchange="resetAll()">
-            <option value="Aa" selected>Aa（丸型・雑種）</option>
-            <option value="AA">AA（丸型・純系）</option>
-            <option value="aa">aa（しわ型・純系）</option>
-        </select>
-    </div>
-
-    <h2 class="section-title">1. 減数分裂の体験</h2>
-    <p>【操作】親の体細胞から染色体を1本ずつ、名前のついた生殖細胞（精子・卵細胞）に分配しよう！</p>
-    
-    <div class="flex-box">
-        <div>
-            <h3>父親の体細胞</h3>
-            <div class="cell-box" id="father-cell" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
-            <h4>作られる精子</h4>
-            <div class="flex-box" style="gap:20px;">
-                <div class="cell-box sperm-box" id="sperm-1" ondragover="allowDrop(event)" ondrop="drop(event)">
-                    <div class="cell-label sperm-label-fix">精子 ☆</div>
-                </div>
-                <div class="cell-box sperm-box" id="sperm-2" ondragover="allowDrop(event)" ondrop="drop(event)">
-                    <div class="cell-label sperm-label-fix">精子 ★</div>
-                </div>
+    <div id="ui-container">
+        <div class="btn-group">
+            <button id="btn-play-pause">一時停止</button>
+            <button id="btn-reset">最初から</button>
+        </div>
+        <div class="slider-group">
+            <div class="slider-label">
+                <span>半径 r (m)</span>
+                <span id="label-r">1.00</span>
             </div>
+            <input type="range" id="slider-r" min="0.2" max="2.0" step="0.1" value="1.0">
         </div>
-
-        <div>
-            <h3>母親の体細胞</h3>
-            <div class="cell-box" id="mother-cell" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
-            <h4>作られる卵細胞</h4>
-            <div class="flex-box" style="gap:20px;">
-                <div class="cell-box egg-box" id="egg-1" ondragover="allowDrop(event)" ondrop="drop(event)">
-                    <div class="cell-label">卵細胞 △</div>
-                </div>
-                <div class="cell-box egg-box" id="egg-2" ondragover="allowDrop(event)" ondrop="drop(event)">
-                    <div class="cell-label">卵細胞 ▲</div>
-                </div>
+        <div class="slider-group">
+            <div class="slider-label">
+                <span>角速度 ω (rad/s)</span>
+                <span id="label-omega">1.50</span>
             </div>
+            <input type="range" id="slider-omega" min="0.5" max="4.0" step="0.1" value="1.5">
         </div>
     </div>
 
-    <div id="law-notification">
-        💡 【分離の法則】対になっていた染色体が分かれて、別々の生殖細胞に1本ずつ入りました！
-    </div>
-
-    <h2 class="section-title">2. 受精と比率のシミュレーション</h2>
-    <div id="fertilization-area">
-        <p>分配が完了したら、ボタンを押して受精卵を作ろう。「100回まとめて受精」を押すと確率のきまりが見えてきます。</p>
-        <button id="fertilize-btn" disabled onclick="performFertilization(1)">受精させる (1回)</button>
-        <button id="fertilize-bulk-btn" class="bulk-btn" disabled onclick="performFertilization(100)">100回まとめて受精！</button>
-        <button class="reset-btn" onclick="resetCounters()">カウンターをリセット</button>
-        
-        <div class="matrix-container" id="result-container" style="display: none;">
-            <div>
-                <h3>起こりうるすべての組み合わせ</h3>
-                <table class="matrix-table">
-                    <tr>
-                        <th style="background: #f1f2f6;">精子＼卵</th>
-                        <th id="th-egg1" style="color: #2980b9;">卵細胞 △</th>
-                        <th id="th-egg2" style="color: #2980b9;">卵細胞 ▲</th>
-                    </tr>
-                    <tr>
-                        <th id="th-sperm1" style="color: #d35400;">精子 ☆</th>
-                        <td id="cell-s1-e1"></td>
-                        <td id="cell-s1-e2"></td>
-                    </tr>
-                    <tr>
-                        <th id="th-sperm2" style="color: #d35400;">精子 ★</th>
-                        <td id="cell-s2-e1"></td>
-                        <td id="cell-s2-e2"></td>
-                    </tr>
-                </table>
-            </div>
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <a-marker preset="hiro">
             
-            <div id="final-verdict" style="min-width: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-left: 2px dashed #ccc; padding-left: 20px;"></div>
-        </div>
+            <a-entity line="start: -1.5 0 0; end: 1.5 0 0; color: #7f8c8d"></a-entity>
+            <a-entity line="start: 0 0 -1.5; end: 0 0 1.5; color: #7f8c8d"></a-entity>
 
-        <div class="stats-area" id="stats-container" style="display: none;">
-            <div class="stats-card">
-                <h4>📊 遺伝子型のカウント (合計: <span id="total-count">0</span> 回)</h4>
-                <table class="counter-table">
-                    <tr><th>AA (純系・丸)</th><th>Aa (雑種・丸)</th><th>aa (純系・しわ)</th></tr>
-                    <tr><td id="count-AA">0</td><td id="count-Aa">0</td><td id="count-aa">0</td></tr>
-                </table>
-                <div class="ratio-output" id="ratio-genotype">実測比 (AA : Aa : aa) ＝ 0 : 0 : 0</div>
-            </div>
-            <div class="stats-card" style="border-left: 1px dashed #ccc;">
-                <h4>🎨 表現型（見た目）のカウント</h4>
-                <table class="counter-table">
-                    <tr><th style="color:#d63031;">丸型 (AA, Aa)</th><th style="color:#0984e3;">しわ型 (aa)</th></tr>
-                    <tr><td id="count-round">0</td><td id="count-wrinkled">0</td></tr>
-                </table>
-                <div class="ratio-output" id="ratio-phenotype" style="color:#d35400;">実測比 (丸 : しわ) ＝ 0 : 0</div>
-            </div>
-        </div>
+            <a-ring id="orbit" color="#ffffff" rotation="-90 0 0" radius-inner="0.99" radius-outer="1.01" opacity="0.6"></a-ring>
 
-    </div>
-</div>
+            <a-entity id="rotator" rotation="0 0 0">
+                <a-sphere id="ball" position="1 0 0" radius="0.08" color="#f5f6fa"></a-sphere>
 
-<script>
-    let counts = { AA: 0, Aa: 0, aa: 0, round: 0, wrinkled: 0, total: 0 };
+                <a-entity id="radius-vector" line="start: 0 0 0; end: 1 0 0; color: #ff9f43"></a-entity>
 
-    function initChromosomes() {
-        document.getElementById('law-notification').style.display = 'none';
-        document.getElementById('fertilize-btn').disabled = true;
-        document.getElementById('fertilize-bulk-btn').disabled = true;
-        document.getElementById('result-container').style.display = 'none';
+                <a-entity id="velocity-vector" position="1 0 0" line="start: 0 0 0; end: 0 0 -0.5; color: #00d2d3"></a-entity>
+
+                <a-entity id="acceleration-vector" position="1 0 0" line="start: 0 0 0; end: -0.5 0 0; color: #ff6b6b"></a-entity>
+            </a-entity>
+
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        // --- 物理パラメータと制御用変数 ---
+        let r = 1.0;      // 半径 (m)
+        let omega = 1.5;  // 角速度 (rad/s)
+        let theta = 0;    // 現在の角度 (rad)
+        let isPlaying = true;
+
+        // DOM要素の取得
+        const sliderR = document.getElementById('slider-r');
+        const sliderOmega = document.getElementById('slider-omega');
+        const labelR = document.getElementById('label-r');
+        const labelOmega = document.getElementById('label-omega');
         
-        const fBox = document.getElementById('father-cell');
-        const mBox = document.getElementById('mother-cell');
-        fBox.innerHTML = ''; mBox.innerHTML = '';
-        
-        document.querySelectorAll('.cell-box .chromosome').forEach(el => el.remove());
+        const valR = document.getElementById('val-r');
+        const valOmega = document.getElementById('val-omega');
+        const valV = document.getElementById('val-v');
+        const valAc = document.getElementById('val-ac');
+        const valT = document.getElementById('val-t');
 
-        const fType = document.getElementById('father-select').value;
-        const mType = document.getElementById('mother-select').value;
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const btnReset = document.getElementById('btn-reset');
 
-        createChrom(fType[0], 'F1', fBox);
-        createChrom(fType[1], 'F2', fBox);
-        createChrom(mType[0], 'M1', mBox);
-        createChrom(mType[1], 'M2', mBox);
-    }
+        // 3D要素の取得
+        const orbit = document.getElementById('orbit');
+        const rotator = document.getElementById('rotator');
+        const ball = document.getElementById('ball');
+        const radiusVector = document.getElementById('radius-vector');
+        const velocityVector = document.getElementById('velocity-vector');
+        const accelerationVector = document.getElementById('acceleration-vector');
 
-    function createChrom(gene, idSuffix, targetElement) {
-        const div = document.createElement('div');
-        div.className = `chromosome gene-${gene}`;
-        div.id = `chrom-${gene}-${idSuffix}`;
-        div.draggable = true;
-        div.innerText = gene;
-        div.addEventListener('dragstart', drag);
-        targetElement.appendChild(div);
-    }
+        // --- パラメータ計算 & UI/3Dの更新処理 ---
+        function updatePhysics() {
+            // 計算
+            const v = r * omega; // 速度
+            const ac = r * omega * omega; // 向心加速度
+            const T = (2 * Math.PI) / omega; // 周期
 
-    function allowDrop(ev) { ev.preventDefault(); }
-    function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+            // UI数値の更新 (小数点2桁)
+            valR.textContent = r.toFixed(2);
+            valOmega.textContent = omega.toFixed(2);
+            valV.textContent = v.toFixed(2);
+            valAc.textContent = ac.toFixed(2);
+            valT.textContent = T.toFixed(2);
 
-    function drop(ev) {
-        ev.preventDefault();
-        const data = ev.dataTransfer.getData("text");
-        const draggedElement = document.getElementById(data);
-        let target = ev.target;
-        while (target && !target.classList.contains('cell-box')) { target = target.parentElement; }
+            labelR.textContent = r.toFixed(2);
+            labelOmega.textContent = omega.toFixed(2);
 
-        if (target) {
-            if (target.id.includes('cell')) {
-                target.appendChild(draggedElement);
-            } else {
-                const hasChromosome = target.querySelector('.chromosome') !== null;
-                if (!hasChromosome) {
-                    const isFatherChrom = draggedElement.id.includes('F');
-                    const isMotherChrom = draggedElement.id.includes('M');
-                    const isSpermBox = target.id.includes('sperm');
-                    const isEggBox = target.id.includes('egg');
-                    if ((isFatherChrom && isSpermBox) || (isMotherChrom && isEggBox)) {
-                        target.appendChild(draggedElement);
-                    }
-                }
+            // 3Dオブジェクトの調整
+            // 1. 軌道円の半径調整
+            orbit.setAttribute('radius-inner', (r - 0.01).toFixed(3));
+            orbit.setAttribute('radius-outer', (r + 0.01).toFixed(3));
+
+            // 2. 小球の位置調整
+            ball.setAttribute('position', `${r} 0 0`);
+
+            // 3. 半径ベクトルの長さ調整
+            radiusVector.setAttribute('line', `start: 0 0 0; end: ${r} 0 0; color: #ff9f43`);
+
+            // 4. ベクトル描画用のスケーリング（物理値そのままだと大きすぎるため1/3程度に視覚調整）
+            const scaleFactor = 0.35; 
+            const vLength = v * scaleFactor;
+            const acLength = ac * scaleFactor;
+
+            // 5. 速度ベクトル（小球のローカル座標でZのマイナス方向が接線方向になります）
+            velocityVector.setAttribute('position', `${r} 0 0`);
+            velocityVector.setAttribute('line', `start: 0 0 0; end: 0 0 ${-vLength}; color: #00d2d3`);
+
+            // 6. 向心加速度ベクトル（小球のローカル座標でXのマイナス方向が中心方向になります）
+            accelerationVector.setAttribute('position', `${r} 0 0`);
+            accelerationVector.setAttribute('line', `start: 0 0 0; end: ${-acLength} 0 0; color: #ff6b6b`);
+        }
+
+        // --- スライダーイベント ---
+        sliderR.addEventListener('input', (e) => {
+            r = parseFloat(e.target.value);
+            updatePhysics();
+        });
+
+        sliderOmega.addEventListener('input', (e) => {
+            omega = parseFloat(e.target.value);
+            updatePhysics();
+        });
+
+        // --- 再生・停止・リセット制御 ---
+        btnPlayPause.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            btnPlayPause.textContent = isPlaying ? "一時停止" : "再生";
+        });
+
+        btnReset.addEventListener('click', () => {
+            theta = 0;
+            rotator.setAttribute('rotation', '0 0 0');
+            if (!isPlaying) {
+                isPlaying = true;
+                btnPlayPause.textContent = "一時停止";
+            }
+        });
+
+        // --- 描画ループ (等速円運動のアニメーション) ---
+        let lastTime = 0;
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            if (!lastTime) lastTime = time;
+            const dt = (time - lastTime) / 1000; // 秒換算
+            lastTime = time;
+
+            if (isPlaying) {
+                // 角度を更新 (dTheta = omega * dt)
+                theta += omega * dt;
+                
+                // A-Frameの回転は度（degree）表記なので変換して適用
+                const degree = (theta * 180 / Math.PI) % 360;
+                rotator.setAttribute('rotation', `0 ${degree} 0`);
             }
         }
-        checkReadyState();
-    }
 
-    function checkReadyState() {
-        const s1 = document.getElementById('sperm-1').querySelectorAll('.chromosome').length;
-        const s2 = document.getElementById('sperm-2').querySelectorAll('.chromosome').length;
-        const e1 = document.getElementById('egg-1').querySelectorAll('.chromosome').length;
-        const e2 = document.getElementById('egg-2').querySelectorAll('.chromosome').length;
-        
-        if (s1 === 1 && s2 === 1 && e1 === 1 && e2 === 1) {
-            document.getElementById('law-notification').style.display = 'block';
-            document.getElementById('fertilize-btn').disabled = false;
-            document.getElementById('fertilize-bulk-btn').disabled = false;
-        } else {
-            document.getElementById('law-notification').style.display = 'none';
-            document.getElementById('fertilize-btn').disabled = true;
-            document.getElementById('fertilize-bulk-btn').disabled = true;
-        }
-    }
+        // 初期化
+        updatePhysics();
+        requestAnimationFrame(animate);
 
-    function generateChromPairHTML(g1, g2, sizeClass = 'chrom-small') {
-        let first = (g1 === 'a' && g2 === 'A') ? 'A' : g1;
-        let second = (g1 === 'a' && g2 === 'A') ? 'a' : g2;
-        return `<div><b>${first}${second}</b></div><div class="chrom-pair-box"><div class="chromosome ${sizeClass} gene-${first}">${first}</div><div class="chromosome ${sizeClass} gene-${second}">${second}</div></div>`;
-    }
-
-    function resetCounters() {
-        counts = { AA: 0, Aa: 0, aa: 0, round: 0, wrinkled: 0, total: 0 };
-        document.getElementById('total-count').innerText = 0;
-        document.getElementById('count-AA').innerText = 0;
-        document.getElementById('count-Aa').innerText = 0;
-        document.getElementById('count-aa').innerText = 0;
-        document.getElementById('count-round').innerText = 0;
-        document.getElementById('count-wrinkled').innerText = 0;
-        document.getElementById('ratio-genotype').innerText = "実測比 (AA : Aa : aa) ＝ 0 : 0 : 0";
-        document.getElementById('ratio-phenotype').innerText = "実測比 (丸 : しわ) ＝ 0 : 0";
-        document.getElementById('stats-container').style.display = 'none';
-    }
-
-    function resetAll() {
-        initChromosomes();
-        resetCounters();
-    }
-
-    // 受精処理（引数にループ回数を指定可能に）
-    function performFertilization(iterations = 1) {
-        const cells = ['cell-s1-e1', 'cell-s1-e2', 'cell-s2-e1', 'cell-s2-e2'];
-        cells.forEach(c => document.getElementById(c).className = '');
-
-        const s1_gene = document.getElementById('sperm-1').querySelector('.chromosome').innerText;
-        const s2_gene = document.getElementById('sperm-2').querySelector('.chromosome').innerText;
-        const e1_gene = document.getElementById('egg-1').querySelector('.chromosome').innerText;
-        const e2_gene = document.getElementById('egg-2').querySelector('.chromosome').innerText;
-
-        document.getElementById('th-sperm1').innerText = `精子 ☆ (${s1_gene})`;
-        document.getElementById('th-sperm2').innerText = `精子 ★ (${s2_gene})`;
-        document.getElementById('th-egg1').innerText = `卵細胞 △ (${e1_gene})`;
-        document.getElementById('th-egg2').innerText = `卵細胞 ▲ (${e2_gene})`;
-
-        document.getElementById('cell-s1-e1').innerHTML = generateChromPairHTML(s1_gene, e1_gene);
-        document.getElementById('cell-s1-e2').innerHTML = generateChromPairHTML(s1_gene, e2_gene);
-        document.getElementById('cell-s2-e1').innerHTML = generateChromPairHTML(s2_gene, e1_gene);
-        document.getElementById('cell-s2-e2').innerHTML = generateChromPairHTML(s2_gene, e2_gene);
-
-        // 最後に選ばれたデータを保持するための変数
-        let lastSpermIdx, lastEggIdx, lastSpermGene, lastEggGene, lastGenotype, lastPhenotype;
-
-        // 指定された回数（1回 または 100回）ループ処理
-        for (let i = 0; i < iterations; i++) {
-            lastSpermIdx = Math.random() < 0.5 ? 1 : 2;
-            lastEggIdx = Math.random() < 0.5 ? 1 : 2;
-
-            lastSpermGene = (lastSpermIdx === 1) ? s1_gene : s2_gene;
-            lastEggGene = (lastEggIdx === 1) ? e1_gene : e2_gene;
-            
-            lastGenotype = (lastSpermGene === 'a' && lastEggGene === 'A') ? 'Aa' : lastSpermGene + lastEggGene;
-            lastPhenotype = (lastGenotype.includes('A')) ? "丸型" : "しわ型";
-
-            // カウント集計
-            counts.total++;
-            counts[lastGenotype]++;
-            if (lastPhenotype === "丸型") { counts.round++; } else { counts.wrinkled++; }
-        }
-
-        // 画面上のテーブルハイライト（最後の1回分を強調表示）
-        const targetCellId = `cell-s${lastSpermIdx}-e${lastEggIdx}`;
-        document.getElementById(targetCellId).className = 'highlight-zygote';
-
-        const spermName = (lastSpermIdx === 1) ? "精子 ☆" : "精子 ★";
-        const eggName = (lastEggIdx === 1) ? "卵細胞 △" : "卵細胞 ▲";
-        const txtColor = (lastPhenotype === "丸型") ? "#d63031" : "#0984e3";
-
-        // 右側の結果表示
-        let titleText = iterations === 1 ? `🎉 <b>受精卵が決定！</b>` : `📊 <b>100回受精完了！</b><br><span style="font-size:12px; font-weight:normal; color:#666;">（以下は最後（${counts.total}回目）の結果）</span>`;
-        document.getElementById('final-verdict').innerHTML = `
-            <p style="font-size:15px; margin:0; text-align:center;">${titleText}</p>
-            <p style="font-size:13px; color:#e67e22; font-weight:bold; margin:3px 0;">
-                【${spermName}】 × 【${eggName}】
-            </p>
-            <div style="border:2px solid #2ecc71; padding:10px; border-radius:10px; background:white; text-align:center; width:160px; margin-top:5px;">
-                ${generateChromPairHTML(lastSpermGene, lastEggGene, 'chrom-large')}
-                <div style="margin-top:5px; font-size:15px;">見た目: <span style="color:${txtColor}; font-weight:bold;">${lastPhenotype}</span></div>
-            </div>
-        `;
-
-        // カウンター表示の更新
-        document.getElementById('total-count').innerText = counts.total;
-        document.getElementById('count-AA').innerText = counts.AA;
-        document.getElementById('count-Aa').innerText = counts.Aa;
-        document.getElementById('count-aa').innerText = counts.aa;
-        document.getElementById('count-round').innerText = counts.round;
-        document.getElementById('count-wrinkled').innerText = counts.wrinkled;
-
-        // 比率の計算（実測値）
-        let minGene = Math.min(counts.AA, counts.Aa, counts.aa) || 1;
-        document.getElementById('ratio-genotype').innerText = `実測比 (AA : Aa : aa) ≒ ${(counts.AA / minGene).toFixed(1)} : ${(counts.Aa / minGene).toFixed(1)} : ${(counts.aa / minGene).toFixed(1)}`;
-
-        let minPheno = Math.min(counts.round, counts.wrinkled) || 1;
-        document.getElementById('ratio-phenotype').innerText = `実測比 (丸 : しわ) ≒ ${(counts.round / minPheno).toFixed(1)} : ${(counts.wrinkled / minPheno).toFixed(1)}`;
-
-        document.getElementById('result-container').style.display = 'flex';
-        document.getElementById('stats-container').style.display = 'flex';
-    }
-
-    window.onload = initChromosomes;
-</script>
-
+    </script>
 </body>
 </html>
