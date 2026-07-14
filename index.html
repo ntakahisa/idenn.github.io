@@ -336,7 +336,7 @@
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
         
-        <a-entity id="ar-world" position="0 -0.5 -1.4" rotation="0 0 0">
+        <a-entity id="ar-world" position="0 0 -1.4">
             
             <a-cylinder radius="0.015" height="0.4" color="#64748b" position="0 0 0"></a-cylinder>
             
@@ -385,6 +385,7 @@
         // トラッキング用ジャイロ制御変数
         const lockedCameraRotation = new THREE.Quaternion();
         const currentDeviceRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+        let initialOffsetCalculated = false;
 
         // UI関係DOM
         const bottomUi = document.getElementById('bottom-ui');
@@ -450,7 +451,7 @@
             }
         }, true);
 
-        // --- タップによる「目の前に完全固定＆解除」ロジックの修正 ---
+        // --- タップによる「目の前に完全固定＆解除」ロジック ---
         window.addEventListener('click', (e) => {
             if (e.target.closest('#bottom-ui') || e.target.closest('#data-panel') || e.target.closest('#view-controls')) return;
 
@@ -460,12 +461,15 @@
             }
 
             if (!isLocked) {
-                // 固定時のカメラの向きをクォータニオンとして記憶
                 const currentQ = new THREE.Quaternion().setFromEuler(currentDeviceRotation);
                 lockedCameraRotation.copy(currentQ);
 
-                // 【バグ修正】タップした瞬間、オブジェクトが勝手に吹き飛ばないよう位置関係を目の前（1.4m）に維持する
-                arWorld.object3D.position.set(0, -0.5, -1.4);
+                // 画面の中心位置に固定。Y軸(高さ)は起動時の傾きから算出した位置で固定
+                const currentPitch = currentDeviceRotation.x; // カメラの上下の傾き
+                const targetY = -1.4 * Math.sin(currentPitch);
+                const targetZ = -1.4 * Math.cos(currentPitch);
+
+                arWorld.object3D.position.set(0, targetY, targetZ);
                 arWorld.object3D.rotation.set(0, 0, 0);
                 
                 isLocked = true;
@@ -484,25 +488,38 @@
             const currentQ = new THREE.Quaternion().setFromEuler(currentDeviceRotation);
 
             if (!isLocked) {
-                // 通常時：カメラはデバイスの向きにそのまま従い、世界はカメラの正面に固定
-                cameraObj.quaternion.copy(currentQ);
-                arWorld.object3D.position.set(0, -0.5, -1.4);
-                arWorld.object3D.rotation.set(0, 0, 0);
-            } else {
-                // 固定時：カメラのみ動きを反映
+                // 通常時：カメラをデバイスの傾きに追従させる
                 cameraObj.quaternion.copy(currentQ);
 
-                // タップした時点のカメラ姿勢と、現在の姿勢の差分を求める
+                // 【初期配置センタリング】
+                // 起動時のデバイスの傾き（ピッチ方向）を取得し、視線の正面に常に回転軸がくるようにY軸とZ軸を自動マッピング
+                const currentPitch = currentDeviceRotation.x;
+                const targetY = -1.4 * Math.sin(currentPitch);
+                const targetZ = -1.4 * Math.cos(currentPitch);
+
+                arWorld.object3D.position.set(0, targetY, targetZ);
+                
+                // 回転平面（X-Z）が床と平行になるよう、世界の姿勢自体を水平に直す（傾きを相殺）
+                arWorld.object3D.rotation.set(-currentPitch, 0, 0);
+            } else {
+                // 固定時：カメラのみ自由に動き、世界はタップした座標にピン留め
+                cameraObj.quaternion.copy(currentQ);
+
                 const diffQ = new THREE.Quaternion().multiplyQuaternions(currentQ, lockedCameraRotation.clone().invert());
                 
-                // 【バグ修正】固定した時の位置（目の前 1.4m先）を基準に、角度差分に応じた正しい位置に世界を投影
-                const baseWorldPos = new THREE.Vector3(0, -0.5, -1.4);
+                // 固定時のピッチを基準にした位置関係を計算
+                const lockedPitch = new THREE.Euler().setFromQuaternion(lockedCameraRotation, 'YXZ').x;
+                const baseWorldPos = new THREE.Vector3(0, -1.4 * Math.sin(lockedPitch), -1.4 * Math.cos(lockedPitch));
+                
                 baseWorldPos.applyQuaternion(diffQ);
                 arWorld.object3D.position.copy(baseWorldPos);
                 
-                // 世界自身の向きも逆回転させて、常に現実空間の同じ方向を向き続けるように補正
+                // 世界の向きを、デバイスの動きと逆方向に回転させて水平状態をキープ
                 const invDiffQ = diffQ.clone().invert();
                 arWorld.object3D.quaternion.copy(invDiffQ);
+                
+                // 固定時も初期の水平状態を維持するための補正ピッチを適用
+                arWorld.object3D.rotateX(-lockedPitch);
             }
         }
 
@@ -528,7 +545,7 @@
             gR.querySelector('a-cylinder').setAttribute('height', r);
             gR.querySelector('a-cylinder').setAttribute('position', `${r / 2} 0 0`);
 
-            // 速度ベクトル（X-Z水平面に水平になるように制御）
+            // 速度ベクトル（X-Z水平面に平行）
             gV.setAttribute('position', `${r} 0 0`);
             const vLength = Math.max(v * 0.2, 0.15);
             gV.querySelector('a-cylinder').setAttribute('height', vLength);
@@ -579,7 +596,6 @@
         function createTrailPoint(x, z) {
             if (!showTrace) return;
             const p = document.createElement('a-sphere');
-            // Y軸を0に固定し、完全に水平面上でプロット
             p.setAttribute('position', `${x} 0 ${z}`);
             p.setAttribute('radius', '0.02');
             p.setAttribute('color', '#a5b4fc');
@@ -635,11 +651,9 @@
 
             if (isPlaying) {
                 theta += omega * dt;
-                // 反時計回りに水平面（Y軸まわり）を綺麗に回転
                 const degree = (theta * 180 / Math.PI) % 360;
                 rotator.setAttribute('rotation', `0 ${degree} 0`);
 
-                // X-Z水平座標の算出
                 const currentX = r * Math.cos(theta);
                 const currentZ = -r * Math.sin(theta);
 
