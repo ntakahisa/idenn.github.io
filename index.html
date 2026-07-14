@@ -9,39 +9,50 @@
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
-        /* 基本スタイル */
-        html, body {
+        body {
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
             overflow: hidden;
             font-family: 'Helvetica Neue', Arial, sans-serif;
             user-select: none;
             background-color: transparent; 
         }
 
-        /* 【重要】縦画面のときはコンテンツ全体を90度回転させて強制的に横画面にする親コンテナ
-        */
-        #app-container {
-            position: absolute;
+        /* 【新機能】縦画面のときに表示する横画面誘導オーバーレイ */
+        #rotate-alert {
+            display: none;
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.95);
+            color: white;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-weight: bold;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
-        /* 縦向き（Portrait）の時に、全体を反時計回りに90度回転させて横向きにする */
+        #rotate-alert .icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+            animation: rotate-anim 2s infinite ease-in-out;
+        }
+
+        @keyframes rotate-anim {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(-90deg); }
+            100% { transform: rotate(-90deg); }
+        }
+
+        /* 縦向き（Portrait）のときだけオーバーレイを表示 */
         @media screen and (orientation: portrait) {
-            #app-container {
-                width: 100vh;
-                height: 100vw;
-                transform: rotate(90deg);
-                transform-origin: bottom left;
-                position: absolute;
-                top: -100vw;
-                left: 0;
+            #rotate-alert {
+                display: flex;
             }
         }
 
@@ -116,7 +127,7 @@
             height: 14px;
         }
 
-        /* 下部メインコントロールUI（常に横画面の比率を基準にレイアウトを最適化） */
+        /* 下部メインコントロールUI */
         #bottom-ui {
             position: absolute;
             bottom: 20px;
@@ -169,7 +180,7 @@
             background: #cbd5e1;
         }
 
-        /* コンテンツ部分（開閉対象、常に2カラムを維持して横画面に最適化） */
+        /* コンテンツ部分（開閉対象、横向きで最も美しく配置される2カラム） */
         #ui-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -266,95 +277,99 @@
 </head>
 <body>
 
-    <div id="app-container">
-
-        <div id="status-alert">📷 現実の机に向けて画面をタップし、円運動の中心軸をその場に完全固定</div>
-
-        <div id="view-controls">
-            <label class="control-item"><input type="checkbox" id="chk-r" checked> 半径ベクトル (橙)</label>
-            <label class="control-item"><input type="checkbox" id="chk-v" checked> 速度ベクトル (青・実線)</label>
-            <label class="control-item"><input type="checkbox" id="chk-a" checked> 向心加速度 (赤・破線)</label>
-            <label class="control-item"><input type="checkbox" id="chk-trace" checked> 運動の軌跡（光）</label>
+    <div id="rotate-alert">
+        <div class="icon">🔄</div>
+        <div style="font-size: 18px; margin-bottom: 8px;">画面を横向きにしてください</div>
+        <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+            このAR教材は、端末を横向きにすることで<br>実験操作パネルと3D空間を最適に表示します。
         </div>
-
-        <div id="data-panel">
-            <div>半径 r: <span id="val-r" class="text-orange">1.00</span> m</div>
-            <div>角速度 ω: <span id="val-omega" class="text-orange">2.00</span> rad/s</div>
-            <div>速度 v: <span id="val-v" class="text-cyan">2.00</span> m/s</div>
-            <div>向心加速度 a_c: <span id="val-ac" class="text-red">4.00</span> m/s²</div>
-            <div>周期 T: <span id="val-t">3.14</span> s</div>
-        </div>
-
-        <div id="bottom-ui">
-            <div id="ui-header">
-                <span id="ui-title-text">📊 実験コントロール</span>
-                <button id="btn-collapse">閉じる ▲</button>
-            </div>
-
-            <div id="ui-content">
-                <div>
-                    <span class="panel-title">パラメータ調整</span>
-                    <div class="slider-container">
-                        <div class="slider-meta"><span>半径 r (m)</span><span id="lbl-r">1.00</span></div>
-                        <input type="range" id="sld-r" min="0.5" max="2.0" step="0.05" value="1.00">
-                    </div>
-                    <div class="slider-container">
-                        <div class="slider-meta"><span>角速度 ω (rad/s)</span><span id="lbl-omega">2.00</span></div>
-                        <input type="range" id="sld-omega" min="0.5" max="4.0" step="0.05" value="2.00">
-                    </div>
-                    <div class="btn-row">
-                        <button id="btn-toggle">一時停止</button>
-                        <button id="btn-clear">最初から</button>
-                    </div>
-                </div>
-
-                <div class="graph-box">
-                    <span class="panel-title">グラフ (リアルタイム変位 x)</span>
-                    <div class="graph-canvas-wrapper">
-                        <canvas id="graphCanvas"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
-            
-            <a-entity id="ar-world" position="0 -0.5 -1.5">
-                
-                <a-cylinder radius="0.015" height="0.3" color="#64748b" position="0 0 0"></a-cylinder>
-                
-                <a-ring id="orbit-ring" color="#ffffff" rotation="-90 0 0" radius-inner="0.99" radius-outer="1.01" opacity="0.8"></a-ring>
-
-                <a-entity id="trail-container"></a-entity>
-
-                <a-entity id="rotator" rotation="0 0 0">
-                    
-                    <a-sphere id="physics-ball" position="1 0 0" radius="0.06" color="#ffffff"></a-sphere>
-
-                    <a-entity id="group-v-r">
-                        <a-cylinder color="#ff9f43" radius="0.01" height="1" rotation="0 0 90" position="0.5 0 0"></a-cylinder>
-                    </a-entity>
-
-                    <a-entity id="group-v-v" position="1 0 0">
-                        <a-cone color="#00d2d3" radius-bottom="0.025" radius-top="0" height="0.12" rotation="90 0 0" position="0 0 -0.4"></a-cone>
-                        <a-cylinder color="#00d2d3" radius="0.008" height="0.4" rotation="90 0 0" position="0 0 -0.2"></a-cylinder>
-                        <a-text value="v" color="#00d2d3" scale="0.35 0.35 0.35" position="0 0.12 -0.25" rotation="-30 0 0"></a-text>
-                    </a-entity>
-
-                    <a-entity id="group-v-a" position="1 0 0">
-                        <a-cone color="#ff6b6b" radius-bottom="0.025" radius-top="0" height="0.12" rotation="0 0 90" position="-0.4 0 0"></a-cone>
-                        <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.08 0 0"></a-cylinder>
-                        <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.26 0 0"></a-cylinder>
-                        <a-text value="a_c" color="#ff6b6b" scale="0.35 0.35 0.35" position="-0.25 0.12 0" rotation="-30 0 0"></a-text>
-                    </a-entity>
-
-                </a-entity>
-            </a-entity>
-
-            <a-entity id="main-camera" camera></a-entity>
-        </a-scene>
-
     </div>
+
+    <div id="status-alert">📷 現実の机に向けて画面をタップし、円運動の中心軸をその場に完全固定</div>
+
+    <div id="view-controls">
+        <label class="control-item"><input type="checkbox" id="chk-r" checked> 半径ベクトル (橙)</label>
+        <label class="control-item"><input type="checkbox" id="chk-v" checked> 速度ベクトル (青・実線)</label>
+        <label class="control-item"><input type="checkbox" id="chk-a" checked> 向心加速度 (赤・破線)</label>
+        <label class="control-item"><input type="checkbox" id="chk-trace" checked> 運動の軌跡（光）</label>
+    </div>
+
+    <div id="data-panel">
+        <div>半径 r: <span id="val-r" class="text-orange">1.00</span> m</div>
+        <div>角速度 ω: <span id="val-omega" class="text-orange">2.00</span> rad/s</div>
+        <div>速度 v: <span id="val-v" class="text-cyan">2.00</span> m/s</div>
+        <div>向心加速度 a_c: <span id="val-ac" class="text-red">4.00</span> m/s²</div>
+        <div>周期 T: <span id="val-t">3.14</span> s</div>
+    </div>
+
+    <div id="bottom-ui">
+        <div id="ui-header">
+            <span id="ui-title-text">📊 実験コントロール</span>
+            <button id="btn-collapse">閉じる ▲</button>
+        </div>
+
+        <div id="ui-content">
+            <div>
+                <span class="panel-title">パラメータ調整</span>
+                <div class="slider-container">
+                    <div class="slider-meta"><span>半径 r (m)</span><span id="lbl-r">1.00</span></div>
+                    <input type="range" id="sld-r" min="0.5" max="2.0" step="0.05" value="1.00">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-meta"><span>角速度 ω (rad/s)</span><span id="lbl-omega">2.00</span></div>
+                    <input type="range" id="sld-omega" min="0.5" max="4.0" step="0.05" value="2.00">
+                </div>
+                <div class="btn-row">
+                    <button id="btn-toggle">一時停止</button>
+                    <button id="btn-clear">最初から</button>
+                </div>
+            </div>
+
+            <div class="graph-box">
+                <span class="panel-title">グラフ (リアルタイム変位 x)</span>
+                <div class="graph-canvas-wrapper">
+                    <canvas id="graphCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
+        
+        <a-entity id="ar-world" position="0 -0.5 -1.5">
+            
+            <a-cylinder radius="0.015" height="0.3" color="#64748b" position="0 0 0"></a-cylinder>
+            
+            <a-ring id="orbit-ring" color="#ffffff" rotation="-90 0 0" radius-inner="0.99" radius-outer="1.01" opacity="0.8"></a-ring>
+
+            <a-entity id="trail-container"></a-entity>
+
+            <a-entity id="rotator" rotation="0 0 0">
+                
+                <a-sphere id="physics-ball" position="1 0 0" radius="0.06" color="#ffffff"></a-sphere>
+
+                <a-entity id="group-v-r">
+                    <a-cylinder color="#ff9f43" radius="0.01" height="1" rotation="0 0 90" position="0.5 0 0"></a-cylinder>
+                </a-entity>
+
+                <a-entity id="group-v-v" position="1 0 0">
+                    <a-cone color="#00d2d3" radius-bottom="0.025" radius-top="0" height="0.12" rotation="90 0 0" position="0 0 -0.4"></a-cone>
+                    <a-cylinder color="#00d2d3" radius="0.008" height="0.4" rotation="90 0 0" position="0 0 -0.2"></a-cylinder>
+                    <a-text value="v" color="#00d2d3" scale="0.35 0.35 0.35" position="0 0.12 -0.25" rotation="-30 0 0"></a-text>
+                </a-entity>
+
+                <a-entity id="group-v-a" position="1 0 0">
+                    <a-cone color="#ff6b6b" radius-bottom="0.025" radius-top="0" height="0.12" rotation="0 0 90" position="-0.4 0 0"></a-cone>
+                    <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.08 0 0"></a-cylinder>
+                    <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.26 0 0"></a-cylinder>
+                    <a-text value="a_c" color="#ff6b6b" scale="0.35 0.35 0.35" position="-0.25 0.12 0" rotation="-30 0 0"></a-text>
+                </a-entity>
+
+            </a-entity>
+        </a-entity>
+
+        <a-entity id="main-camera" camera></a-entity>
+    </a-scene>
 
     <script>
         let isLocked = false;
@@ -414,11 +429,6 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // 画面の向きを検知するヘルパー（縦向き：true, 横向き：false）
-        function isPortrait() {
-            return window.innerHeight > window.innerWidth;
-        }
-
         // --- 折りたたみ（縮小）制御イベント ---
         btnCollapse.addEventListener('click', () => {
             bottomUi.classList.toggle('collapsed');
@@ -427,6 +437,7 @@
                 btnCollapse.textContent = '開く ▼';
             } else {
                 btnCollapse.textContent = '閉じる ▲';
+                // 開いた瞬間にキャンバスサイズを再計算
                 setTimeout(resizeCanvas, 310); 
             }
         });
@@ -434,17 +445,10 @@
         // スマホのジャイロセンサー情報のリアルタイム受信処理
         window.addEventListener('deviceorientation', (event) => {
             if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-                let alphaRad = THREE.MathUtils.degToRad(event.alpha);
-                let betaRad = THREE.MathUtils.degToRad(event.beta);
-                let gammaRad = THREE.MathUtils.degToRad(event.gamma);
-
-                // 端末が縦向きかつCSSで90度回転している場合、ジャイロの軸変換をかける
-                if (isPortrait()) {
-                    // 縦持ち時にCSSで90度倒しているため、ジャイロのロール（gamma）とピッチ（beta）をスワップ
-                    const temp = betaRad;
-                    betaRad = -gammaRad;
-                    gammaRad = temp;
-                }
+                // 通常のオイラー角マッピングに戻して計算を安定化
+                const alphaRad = THREE.MathUtils.degToRad(event.alpha);
+                const betaRad = THREE.MathUtils.degToRad(event.beta);
+                const gammaRad = THREE.MathUtils.degToRad(event.gamma);
                 
                 currentDeviceRotation.set(betaRad, alphaRad, -gammaRad);
             }
@@ -454,6 +458,7 @@
         window.addEventListener('click', (e) => {
             if (e.target.closest('#bottom-ui') || e.target.closest('#data-panel') || e.target.closest('#view-controls')) return;
 
+            // iOS用センサー解放トリガー
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().catch(err => console.error(err));
             }
