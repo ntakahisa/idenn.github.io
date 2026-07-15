@@ -69,6 +69,7 @@
             justify-content: center;
             align-items: center;
             pointer-events: none; 
+            transition: opacity 0.3s ease;
         }
 
         #scan-reticle {
@@ -103,14 +104,9 @@
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.4);
             pointer-events: none;
-            transition: all 0.3s ease;
+            transition: opacity 0.3s ease, transform 0.3s ease;
             white-space: nowrap;
             border: 1px solid rgba(255,255,255,0.1);
-        }
-        .status-locked {
-            background: rgba(126, 204, 73, 0.95) !important;
-            color: #1a3a05 !important;
-            border: none;
         }
 
         /* 右側コントロールエリア */
@@ -123,6 +119,7 @@
             flex-direction: column;
             gap: 10px;
             width: 170px;
+            transition: all 0.3s ease;
         }
 
         /* 数値表示パネル */
@@ -132,10 +129,52 @@
             padding: 12px;
             border-radius: 8px;
             font-size: 13px;
-            pointer-events: none;
             line-height: 1.6;
             font-family: monospace;
+            transition: all 0.3s ease;
+            max-height: 200px;
+            overflow: hidden;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.1);
         }
+        
+        #data-panel.collapsed {
+            max-height: 38px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.85);
+        }
+
+        #panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+        #panel-header.collapsed {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        #panel-title-text {
+            font-weight: bold;
+            font-size: 11px;
+            color: #ccc;
+        }
+
+        #btn-panel-toggle {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            font-size: 9px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
         .text-orange { color: #ff9f43; font-weight: bold; }
         .text-cyan { color: #00d2d3; font-weight: bold; }
         .text-red { color: #ff6b6b; font-weight: bold; }
@@ -307,11 +346,17 @@
 
     <div id="right-controls">
         <div id="data-panel">
-            <div>半径 r: <span id="val-r" class="text-orange">1.00</span> m</div>
-            <div>角速度 ω: <span id="val-omega" class="text-orange">2.00</span> rad/s</div>
-            <div>速度 v: <span id="val-v" class="text-cyan">2.00</span> m/s</div>
-            <div>向心加速度 a_c: <span id="val-ac" class="text-red">4.00</span> m/s²</div>
-            <div>周期 T: <span id="val-t">3.14</span> s</div>
+            <div id="panel-header">
+                <span id="panel-title-text">📝 物理データ</span>
+                <button id="btn-panel-toggle">閉じる ▲</button>
+            </div>
+            <div id="panel-body">
+                <div>半径 r: <span id="val-r" class="text-orange">1.00</span> m</div>
+                <div>角速度 ω: <span id="val-omega" class="text-orange">2.00</span> rad/s</div>
+                <div>速度 v: <span id="val-v" class="text-cyan">2.00</span> m/s</div>
+                <div>向心加速度 a_c: <span id="val-ac" class="text-red">4.00</span> m/s²</div>
+                <div>周期 T: <span id="val-t">3.14</span> s</div>
+            </div>
         </div>
         <div id="btn-fullscreen">🖥️ 全画面表示</div>
     </div>
@@ -416,10 +461,16 @@
         // UI関係DOM
         const bottomUi = document.getElementById('bottom-ui');
         const btnCollapse = document.getElementById('btn-collapse');
+        const scanContainer = document.getElementById('scan-container');
         const scanReticle = document.getElementById('scan-reticle');
         const statusAlert = document.getElementById('status-alert');
         const btnFullscreen = document.getElementById('btn-fullscreen');
         const sceneContainer = document.getElementById('ar-scene-container');
+        
+        // 数値パネルの折りたたみ用DOM
+        const dataPanel = document.getElementById('data-panel');
+        const panelHeader = document.getElementById('panel-header');
+        const btnPanelToggle = document.getElementById('btn-panel-toggle');
 
         const sldR = document.getElementById('sld-r');
         const sldOmega = document.getElementById('sld-omega');
@@ -459,6 +510,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
+        // 下部パネル折りたたみ
         btnCollapse.addEventListener('click', () => {
             bottomUi.classList.toggle('collapsed');
             if (bottomUi.classList.contains('collapsed')) {
@@ -469,13 +521,28 @@
             }
         });
 
-        // 【修正】AR.jsと高確率で競合しないコンテナ全画面化処理
+        // 【新規】右上数値パネルの折りたたみロジック
+        function toggleDataPanel() {
+            dataPanel.classList.toggle('collapsed');
+            panelHeader.classList.toggle('collapsed');
+            if (dataPanel.classList.contains('collapsed')) {
+                btnPanelToggle.textContent = '開く ▼';
+            } else {
+                btnPanelToggle.textContent = '閉じる ▲';
+            }
+        }
+        panelHeader.addEventListener('click', toggleDataPanel);
+        btnPanelToggle.addEventListener('click', (e) => {
+            e.stopPropagation(); // ヘッダークリックの重複イベントを防止
+            toggleDataPanel();
+        });
+
+        // 全画面表示制御
         btnFullscreen.addEventListener('click', () => {
             if (!document.fullscreenElement) {
                 sceneContainer.requestFullscreen().then(() => {
                     btnFullscreen.textContent = "❌ 全画面解除";
                 }).catch(err => {
-                    // 失敗した場合はbody全体のフルスクリーンをフォールバック試行
                     document.documentElement.requestFullscreen();
                 });
             } else {
@@ -492,41 +559,47 @@
             setTimeout(resizeCanvas, 200);
         });
 
-        // 画面タップでロックをリセットして再スキャン可能にする機構
+        // 画面タップでロックをリセット
         window.addEventListener('click', (e) => {
             if (e.target.closest('#bottom-ui') || e.target.closest('#right-controls') || e.target.closest('#view-controls')) return;
             if (isLocked) {
                 isLocked = false;
                 arWorld.setAttribute('visible', 'false');
+                
+                // 【修正】スキャンUIとバナーを再表示
+                scanContainer.style.opacity = '1';
+                statusAlert.style.opacity = '1';
+                statusAlert.style.transform = 'translateX(-50%) translateY(0)';
+                
                 scanReticle.classList.remove('detected');
                 statusAlert.textContent = "🔍 マーカーを中央の枠内に収めて平面を認識してください";
-                statusAlert.classList.remove('status-locked');
+                statusAlert.style.background = "rgba(15, 23, 42, 0.85)";
+                statusAlert.style.color = "white";
             }
         });
 
-        // マーカー認識時のロック制御（回転軸のブレを解消する厳密な算出）
+        // マーカー認識時のロック制御
         marker.addEventListener('markerFound', () => {
             if (!isLocked) {
                 marker.object3D.updateMatrixWorld();
                 mainCamera.object3D.updateMatrixWorld();
                 
-                // マーカーの正確なトランスフォーム情報をクォータニオン分解で取得
                 marker.object3D.matrixWorld.decompose(markerPos, markerQuat, markerScale);
                 mainCamera.object3D.matrixWorld.decompose(camPos, camQuat, markerScale);
 
-                // カメラから見たマーカーの相対位置・回転を保存
                 relPos.copy(markerPos).sub(camPos).applyQuaternion(camQuat.clone().invert());
                 relQuat.copy(camQuat.clone().invert()).multiply(markerQuat);
                 
-                // 回転ステージを水平（垂直なY軸）に完全に補正固定する
                 arWorld.object3D.position.copy(markerPos);
                 arWorld.object3D.quaternion.copy(markerQuat);
                 
                 isLocked = true;
                 arWorld.setAttribute('visible', 'true');
-                scanReticle.classList.add('detected');
-                statusAlert.textContent = "🟢 空間固定成功！周り込んで観察できます（タップで再設定）";
-                statusAlert.classList.add('status-locked');
+                
+                // 【修正】空間固定成功時にスキャンUIとバナーをなめらかに完全消去
+                scanContainer.style.opacity = '0';
+                statusAlert.style.opacity = '0';
+                statusAlert.style.transform = 'translateX(-50%) translateY(-20px)';
             }
         });
 
@@ -646,18 +719,15 @@
                 mainCamera.object3D.matrixWorld.decompose(camPos, camQuat, markerScale);
 
                 if (marker.visible) {
-                    // マーカーが見えている間は、高精度なトラッキングで位置ブレを滑らかに補正（Lerp）
                     marker.object3D.updateMatrixWorld();
                     marker.object3D.matrixWorld.decompose(markerPos, markerQuat, markerScale);
                     
                     arWorld.object3D.position.lerp(markerPos, 0.15);
                     arWorld.object3D.quaternion.slerp(markerQuat, 0.15);
 
-                    // 最新の相対位置関係をバックアップ更新
                     relPos.copy(markerPos).sub(camPos).applyQuaternion(camQuat.clone().invert());
                     relQuat.copy(camQuat.clone().invert()).multiply(markerQuat);
                 } else {
-                    // 【画期的修正】マーカーが外れた後：スマホのデバイスジャイロの動き（視点変更）に合わせて物体の位置を逆計算して引き留める
                     const globalTargetPos = relPos.clone().applyQuaternion(camQuat).add(camPos);
                     const globalTargetQuat = camQuat.clone().multiply(relQuat);
 
