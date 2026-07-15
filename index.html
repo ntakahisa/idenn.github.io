@@ -1,156 +1,583 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-  <title>等速円運動（マーカーロック・高精度復旧版）</title>
-  
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
-  
-  <script>
-    // 確実な挙動を担保する「位置固定」コンポーネント
-    AFRAME.registerComponent('world-lock', {
-      init: function () {
-        this.marker = document.querySelector('#ar-marker');
-        this.container = document.querySelector('#locked-container');
-        this.hasLocked = false;
-        
-        // 念のためマーカーが確実に見つかった時のイベントを購読
-        this.marker.addEventListener('markerFound', () => {
-          this.lockPosition();
-        });
-      },
-      tick: function () {
-        // バックアップ処理：イベントが発火しなくても、visibleがtrueになったら強制ロック
-        if (this.marker && this.marker.object3D.visible && !this.hasLocked) {
-          this.lockPosition();
-        }
-      },
-      lockPosition: function() {
-        if (this.hasLocked) return;
-        
-        const worldPosition = new THREE.Vector3();
-        const worldQuaternion = new THREE.Quaternion();
-        const worldScale = new THREE.Vector3();
-        
-        // マーカーの絶対座標を分解・保存
-        this.marker.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
-        
-        // マーカーの真上30cm (Y=0.3) を世界座標に設定
-        this.container.object3D.position.copy(worldPosition);
-        // マーカーと完全に同じ傾き（水平面）を同期
-        this.container.object3D.quaternion.copy(worldQuaternion);
-        
-        this.container.setAttribute('visible', 'true');
-        this.hasLocked = true;
-        
-        // UIの文字を切り替え
-        const statusEl = document.querySelector('#status');
-        if(statusEl) {
-          statusEl.innerText = "✨ 位置固定完了！マーカーを外して、横から回り込んでみてください！";
-          statusEl.style.backgroundColor = "rgba(40, 167, 69, 0.9)";
-        }
-      }
-    });
-
-    // 物理シミュレーション駆動
-    AFRAME.registerComponent('circular-motion', {
-      schema: {
-        radius: {type: 'number', default: 1.2},
-        speed: {type: 'number', default: 0.002}
-      },
-      init: function () {
-        this.angle = 0;
-      },
-      tick: function (time, timeDelta) {
-        this.angle += this.data.speed * timeDelta;
-        
-        const x = this.data.radius * Math.cos(this.angle);
-        const z = this.data.radius * Math.sin(this.angle);
-        
-        // ステージの真上（Y=0）で等速円運動
-        this.el.setAttribute('position', {x: x, y: 0, z: z});
-        
-        const shadowBall = document.querySelector('#shadow-ball');
-        if (shadowBall) {
-          shadowBall.setAttribute('position', {x: x, y: -0.4, z: 0});
-        }
-      }
-    });
-  </script>
-  
-  <style>
-    #status {
-      position: absolute;
-      top: 15px;
-      left: 15px;
-      right: 15px;
-      padding: 12px;
-      background: rgba(220, 53, 69, 0.9);
-      color: white;
-      font-family: 'Helvetica Neue', sans-serif;
-      font-weight: bold;
-      font-size: 13px;
-      text-align: center;
-      border-radius: 8px;
-      z-index: 999;
-      pointer-events: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    button {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 14px 28px;
-      font-size: 15px;
-      font-weight: bold;
-      background-color: #007BFF;
-      color: white;
-      border: none;
-      border-radius: 30px;
-      z-index: 999;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(0,123,255,0.4);
-    }
-  </style>
-</head>
-
-<body style="margin: 0; overflow: hidden; background: #000;">
-  
-  <div id="status">📷 カメラをHiroマーカーに向けてください。ピタッと位置を固定します。</div>
-  
-  <button onclick="location.reload();">🔄 位置をリセット</button>
-
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" world-lock>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>等速円運動 マーカー完全固定AR教材（フル機能版）</title>
     
-    <a-marker id="ar-marker" preset="hiro" smooth="false"></a-marker>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            user-select: none;
+            background-color: transparent; 
+        }
 
-    <a-entity id="locked-container" visible="false">
-      
-      <a-entity position="0 0.3 0">
+        /* 全画面表示時にも背面のカメラ映像を最背面に維持する設定 */
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 0 !important;
+            object-fit: cover;
+        }
+
+        /* 画面中央のスキャン枠UI */
+        #scan-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none; 
+            transition: opacity 0.3s ease;
+        }
+
+        #scan-reticle {
+            width: 240px;
+            height: 240px;
+            border: 4px dashed #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); 
+        }
+
+        /* 状態案内UI */
+        #status-alert {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            z-index: 100;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            pointer-events: none;
+            transition: all 0.3s ease;
+            width: 80%;
+            max-width: 320px;
+            box-sizing: border-box;
+        }
+
+        /* 右側コントロールエリア */
+        #right-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 155px;
+        }
+
+        #data-panel {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+            font-family: monospace;
+            max-height: 180px;
+            overflow: hidden;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
         
-        <a-cylinder radius="0.015" height="0.3" color="#64748b" position="0 -0.15 0"></a-cylinder>
-        <a-cone radius-bottom="0.04" radius-top="0.015" height="0.04" color="#475569" position="0 -0.3 0"></a-cone>
+        #data-panel.collapsed {
+            max-height: 34px;
+            padding: 6px 10px;
+        }
 
-        <a-ring color="#e2e8f0" radius-inner="1.18" radius-outer="1.22" rotation="-90 0 0" opacity="0.6"></a-ring>
+        #panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+        #panel-header.collapsed { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        #panel-title-text { font-weight: bold; font-size: 11px; color: #ccc; }
+        #btn-panel-toggle { background: rgba(255,255,255,0.2); color: white; border: none; padding: 2px 6px; font-size: 9px; border-radius: 10px; cursor: pointer; }
 
-        <a-sphere radius="0.04" color="#475569"></a-sphere>
+        .text-orange { color: #ff9f43; font-weight: bold; }
+        .text-cyan { color: #00d2d3; font-weight: bold; }
+        .text-red { color: #ff6b6b; font-weight: bold; }
 
-        <a-entity circular-motion="radius: 1.2; speed: 0.002">
-          <a-sphere radius="0.12" color="#FF4136"></a-sphere>
-          <a-cylinder color="#ff9f43" radius="0.01" height="1.2" rotation="0 0 90" position="-0.6 0 0"></a-cylinder>
-        </a-entity>
+        #btn-fullscreen {
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
 
-        <a-cylinder color="#334155" radius="0.008" height="3.0" rotation="0 0 90" position="0 -0.4 0" opacity="0.5"></a-cylinder>
-        <a-sphere id="shadow-ball" radius="0.09" color="#0074D9" opacity="0.9"></a-sphere>
+        /* 左側操作チェックボックス */
+        #view-controls {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 90;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 150px;
+        }
+        .control-item { display: flex; align-items: center; font-size: 11px; font-weight: bold; color: #333; cursor: pointer; }
+        .control-item input { margin-right: 5px; width: 13px; height: 13px; }
 
-      </a-entity>
+        /* 下部メインコントロールUI */
+        #bottom-ui {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
+            max-width: 450px; 
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            z-index: 90;
+            box-sizing: border-box;
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            max-height: 480px;
+        }
 
-    </a-entity>
+        #ui-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+        #ui-title-text { font-size: 13px; font-weight: bold; color: #333; }
+        #btn-collapse { background: #e2e8f0; color: #4a5568; border: none; padding: 3px 10px; font-size: 10px; border-radius: 12px; cursor: pointer; font-weight: bold; }
+        #ui-content { display: flex; flex-direction: column; gap: 12px; }
+        #bottom-ui.collapsed { padding: 8px 12px; max-height: 40px; overflow: hidden; }
+        #bottom-ui.collapsed #ui-header { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+        #bottom-ui.collapsed #ui-content { opacity: 0; pointer-events: none; }
 
-    <a-entity camera></a-entity>
-  </scene>
+        .panel-title { font-size: 11px; font-weight: bold; color: #fff; background: #007bff; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
+        .slider-container { margin-bottom: 6px; }
+        .slider-meta { display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #333; margin-bottom: 2px; }
+        input[type="range"] { width: 100%; height: 5px; }
+        .btn-row { display: flex; gap: 6px; margin-top: 6px; }
+        button.action-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; background: #007bff; color: white; font-weight: bold; font-size: 11px; cursor: pointer; }
+
+        .graph-box { display: flex; flex-direction: column; justify-content: center; }
+        .graph-canvas-wrapper { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; height: 75px; }
+        canvas { width: 100%; height: 100%; }
+
+        #ar-scene-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        a-scene { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="scan-container">
+        <div id="scan-reticle"></div>
+    </div>
+
+    <div id="status-alert">📷 カメラをHiroマーカーに向けて位置を固定してください</div>
+
+    <div id="view-controls">
+        <label class="control-item"><input type="checkbox" id="chk-r" checked> 半径ベクトル (橙)</label>
+        <label class="control-item"><input type="checkbox" id="chk-v" checked> 速度ベクトル (青)</label>
+        <label class="control-item"><input type="checkbox" id="chk-a" checked> 向心加速度 (赤)</label>
+        <label class="control-item"><input type="checkbox" id="chk-trace" checked> 運動の軌跡（光）</label>
+    </div>
+
+    <div id="right-controls">
+        <div id="data-panel">
+            <div id="panel-header">
+                <span id="panel-title-text">📝 物理データ</span>
+                <button id="btn-panel-toggle">閉じる ▲</button>
+            </div>
+            <div id="panel-body">
+                <div>半径 r: <span id="val-r" class="text-orange">1.20</span> m</div>
+                <div>角速度 ω: <span id="val-omega" class="text-orange">2.00</span> rad/s</div>
+                <div>速度 v: <span id="val-v" class="text-cyan">2.40</span> m/s</div>
+                <div>向心加速度 a_c: <span id="val-ac" class="text-red">4.80</span> m/s²</div>
+                <div>周期 T: <span id="val-t">3.14</span> s</div>
+            </div>
+        </div>
+        <button id="btn-fullscreen" class="action-btn">🖥️ 全画面表示</button>
+    </div>
+
+    <div id="bottom-ui">
+        <div id="ui-header">
+            <span id="ui-title-text">📊 実験コントロール</span>
+            <button id="btn-collapse">閉じる ▲</button>
+        </div>
+
+        <div id="ui-content">
+            <div>
+                <span class="panel-title">パラメータ調整</span>
+                <div class="slider-container">
+                    <div class="slider-meta"><span>半径 r (m)</span><span id="lbl-r">1.20</span></div>
+                    <input type="range" id="sld-r" min="0.5" max="2.0" step="0.05" value="1.20">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-meta"><span>角速度 ω (rad/s)</span><span id="lbl-omega">2.00</span></div>
+                    <input type="range" id="sld-omega" min="0.5" max="4.0" step="0.05" value="2.00">
+                </div>
+                <div class="btn-row">
+                    <button id="btn-toggle" class="action-btn">一時停止</button>
+                    <button id="btn-clear" class="action-btn">最初から（リセット）</button>
+                </div>
+            </div>
+
+            <div class="graph-box">
+                <span class="panel-title">グラフ (リアルタイム変位 x)</span>
+                <div class="graph-canvas-wrapper">
+                    <canvas id="graphCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ar-scene-container">
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="alpha: true; antialias: true; colorManagement: true;" vr-mode-ui="enabled: false" world-lock>
+            
+            <a-marker id="ar-marker" preset="hiro" smooth="false"></a-marker>
+                
+            <a-entity id="locked-container" visible="false">
+                
+                <a-entity position="0 0.3 0">
+                    
+                    <a-cylinder radius="0.015" height="0.3" color="#64748b" position="0 -0.15 0"></a-cylinder>
+                    <a-cone radius-bottom="0.04" radius-top="0.015" height="0.04" color="#475569" position="0 -0.3 0"></a-cone>
+                    
+                    <a-ring id="orbit-ring" color="#ffffff" rotation="-90 0 0" radius-inner="1.19" radius-outer="1.21" opacity="0.8"></a-ring>
+                    
+                    <a-sphere radius="0.04" color="#475569"></a-sphere>
+
+                    <a-entity id="trail-container"></a-entity>
+
+                    <a-entity id="rotator" rotation="0 0 0">
+                        <a-sphere id="physics-ball" position="1.2 0 0" radius="0.08" color="#FF4136"></a-sphere>
+
+                        <a-entity id="group-v-r">
+                            <a-cylinder id="arrow-r" color="#ff9f43" radius="0.012" height="1.2" rotation="0 0 90" position="0.6 0 0"></a-cylinder>
+                        </a-entity>
+
+                        <a-entity id="group-v-v" position="1.2 0 0">
+                            <a-cone color="#00d2d3" radius-bottom="0.03" radius-top="0" height="0.12" rotation="90 0 0" position="0 0 -0.4"></a-cone>
+                            <a-cylinder id="arrow-v-cyl" color="#00d2d3" radius="0.009" height="0.4" rotation="90 0 0" position="0 0 -0.2"></a-cylinder>
+                            <a-text value="v" color="#00d2d3" scale="0.4 0.4 0.4" position="0 0.15 -0.25" rotation="-30 0 0"></a-text>
+                        </a-entity>
+
+                        <a-entity id="group-v-a" position="1.2 0 0">
+                            <a-cone color="#ff6b6b" radius-bottom="0.03" radius-top="0" height="0.12" rotation="0 0 90" position="-0.4 0 0"></a-cone>
+                            <a-cylinder id="arrow-a-cyl1" color="#ff6b6b" radius="0.009" height="0.1" rotation="0 0 90" position="-0.08 0 0"></a-cylinder>
+                            <a-cylinder id="arrow-a-cyl2" color="#ff6b6b" radius="0.009" height="0.1" rotation="0 0 90" position="-0.26 0 0"></a-cylinder>
+                            <a-text value="a_c" color="#ff6b6b" scale="0.4 0.4 0.4" position="-0.25 0.15 0" rotation="-30 0 0"></a-text>
+                        </a-entity>
+                    </a-entity>
+
+                    <a-cylinder color="#334155" radius="0.008" height="4.5" rotation="0 0 90" position="0 -0.4 0" opacity="0.4"></a-cylinder>
+                    <a-sphere id="shadow-ball" radius="0.07" color="#0074D9" opacity="0.9"></a-sphere>
+                    
+                </a-entity>
+            </a-entity>
+
+            <a-entity id="main-camera" camera look-controls="enabled: false"></a-entity>
+        </a-scene>
+    </div>
+
+    <script>
+        let r = 1.20;
+        let omega = 2.00;
+        let theta = 0;
+        let isPlaying = true;
+        let showR = true, showV = true, showA = true, showTrace = true;
+        
+        let isLocked = false;
+        const xHistory = [];
+        const maxHistoryLen = 120;
+
+        // UI関係DOM
+        const bottomUi = document.getElementById('bottom-ui');
+        const btnCollapse = document.getElementById('btn-collapse');
+        const scanContainer = document.getElementById('scan-container');
+        const statusAlert = document.getElementById('status-alert');
+        const btnFullscreen = document.getElementById('btn-fullscreen');
+        
+        const dataPanel = document.getElementById('data-panel');
+        const panelHeader = document.getElementById('panel-header');
+        const btnPanelToggle = document.getElementById('btn-panel-toggle');
+
+        const sldR = document.getElementById('sld-r');
+        const sldOmega = document.getElementById('sld-omega');
+        const lblR = document.getElementById('lbl-r');
+        const lblOmega = document.getElementById('lbl-omega');
+        const valR = document.getElementById('val-r');
+        const valOmega = document.getElementById('val-omega');
+        const valV = document.getElementById('val-v');
+        const valAc = document.getElementById('val-ac');
+        const valT = document.getElementById('val-t');
+        const btnToggle = document.getElementById('btn-toggle');
+        const btnClear = document.getElementById('btn-clear');
+        const chkR = document.getElementById('chk-r');
+        const chkV = document.getElementById('chk-v');
+        const chkA = document.getElementById('chk-a');
+        const chkTrace = document.getElementById('chk-trace');
+
+        // 3DオブジェクトDOM
+        const rotator = document.getElementById('rotator');
+        const ball = document.getElementById('physics-ball');
+        const orbitRing = document.getElementById('orbit-ring');
+        const trailContainer = document.getElementById('trail-container');
+        const shadowBall = document.getElementById('shadow-ball');
+        const gR = document.getElementById('group-v-r');
+        const gV = document.getElementById('group-v-v');
+        const gA = document.getElementById('group-v-a');
+
+        // 高精度位置ロック用コンポーネントの登録
+        AFRAME.registerComponent('world-lock', {
+            init: function () {
+                this.marker = document.querySelector('#ar-marker');
+                this.container = document.querySelector('#locked-container');
+                
+                this.marker.addEventListener('markerFound', () => {
+                    this.lock();
+                });
+            },
+            tick: function () {
+                if (this.marker && this.marker.object3D.visible && !isLocked) {
+                    this.lock();
+                }
+            },
+            lock: function() {
+                if (isLocked) return;
+                const worldPosition = new THREE.Vector3();
+                const worldQuaternion = new THREE.Quaternion();
+                const worldScale = new THREE.Vector3();
+                
+                this.marker.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
+                
+                this.container.object3D.position.copy(worldPosition);
+                this.container.object3D.quaternion.copy(worldQuaternion);
+                
+                this.container.setAttribute('visible', 'true');
+                isLocked = true;
+                
+                // UI表示変更
+                scanContainer.style.opacity = '0';
+                statusAlert.innerText = "✨ 位置固定完了！マーカーから離れて、真横から観察できます。";
+                statusAlert.style.backgroundColor = "rgba(40, 167, 69, 0.9)";
+                setTimeout(() => { statusAlert.style.opacity = '0'; }, 3000);
+            }
+        });
+
+        // Canvas初期化
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 下部パネル折りたたみ
+        btnCollapse.addEventListener('click', () => {
+            bottomUi.classList.toggle('collapsed');
+            btnCollapse.textContent = bottomUi.classList.contains('collapsed') ? '開く ▼' : '閉じる ▲';
+            if (!bottomUi.classList.contains('collapsed')) setTimeout(resizeCanvas, 310);
+        });
+
+        // 右上数値パネル折りたたみ
+        function toggleDataPanel() {
+            dataPanel.classList.toggle('collapsed');
+            panelHeader.classList.toggle('collapsed');
+            btnPanelToggle.textContent = dataPanel.classList.contains('collapsed') ? '開く ▼' : '閉じる ▲';
+        }
+        panelHeader.addEventListener('click', toggleDataPanel);
+        btnPanelToggle.addEventListener('click', (e) => { e.stopPropagation(); toggleDataPanel(); });
+
+        // 全画面表示制御（カメラ維持のためbody全体をフルスクリーン化）
+        btnFullscreen.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    btnFullscreen.textContent = "❌ 全画面解除";
+                }).catch(err => console.log(err));
+            } else {
+                document.exitFullscreen().then(() => {
+                    btnFullscreen.textContent = "🖥️ 全画面表示";
+                });
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) btnFullscreen.textContent = "🖥️ 全画面表示";
+            setTimeout(resizeCanvas, 200);
+        });
+
+        // 物理計算の更新
+        function updatePhysics() {
+            const v = r * omega;
+            const ac = r * omega * omega;
+            const T = (2 * Math.PI) / omega;
+
+            valR.textContent = r.toFixed(2);
+            valOmega.textContent = omega.toFixed(2);
+            valV.textContent = v.toFixed(2);
+            valAc.textContent = ac.toFixed(2);
+            valT.textContent = T.toFixed(2);
+
+            lblR.textContent = r.toFixed(2);
+            lblOmega.textContent = omega.toFixed(2);
+
+            ball.setAttribute('position', `${r} 0 0`);
+            orbitRing.setAttribute('radius-inner', (r - 0.015).toFixed(3));
+            orbitRing.setAttribute('radius-outer', (r + 0.015).toFixed(3));
+            
+            // 半径ロッド更新
+            gR.querySelector('a-cylinder').setAttribute('height', r);
+            gR.querySelector('a-cylinder').setAttribute('position', `${r / 2} 0 0`);
+
+            // 速度ベクトル更新
+            gV.setAttribute('position', `${r} 0 0`);
+            const vLength = Math.max(v * 0.2, 0.15);
+            gV.querySelector('a-cylinder').setAttribute('height', vLength);
+            gV.querySelector('a-cylinder').setAttribute('position', `0 0 ${-vLength / 2}`);
+            gV.querySelector('a-cone').setAttribute('position', `0 0 ${-vLength}`);
+
+            // 加速度ベクトル更新
+            gA.setAttribute('position', `${r} 0 0`);
+            const aLength = Math.max(ac * 0.1, 0.15);
+            const cylinders = gA.querySelectorAll('a-cylinder');
+            cylinders[0].setAttribute('height', aLength * 0.4);
+            cylinders[0].setAttribute('position', `${-aLength * 0.2} 0 0`);
+            cylinders[1].setAttribute('height', aLength * 0.3);
+            cylinders[1].setAttribute('position', `${-aLength * 0.7} 0 0`);
+            gA.querySelector('a-cone').setAttribute('position', `${-aLength}`);
+        }
+
+        function updateVisibility() {
+            gR.setAttribute('visible', showR);
+            gV.setAttribute('visible', showV);
+            gA.setAttribute('visible', showA);
+            trailContainer.setAttribute('visible', showTrace);
+        }
+
+        chkR.addEventListener('change', (e) => { showR = e.target.checked; updateVisibility(); });
+        chkV.addEventListener('change', (e) => { showV = e.target.checked; updateVisibility(); });
+        chkA.addEventListener('change', (e) => { showA = e.target.checked; updateVisibility(); });
+        chkTrace.addEventListener('change', (e) => { showTrace = e.target.checked; updateVisibility(); if(!showTrace) trailContainer.innerHTML=''; });
+
+        sldR.addEventListener('input', (e) => { r = parseFloat(e.target.value); updatePhysics(); });
+        sldOmega.addEventListener('input', (e) => { omega = parseFloat(e.target.value); updatePhysics(); });
+        
+        btnToggle.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            btnToggle.textContent = isPlaying ? "一時停止" : "再 生";
+        });
+        
+        btnClear.addEventListener('click', () => {
+            theta = 0;
+            xHistory.length = 0;
+            trailContainer.innerHTML = '';
+            rotator.setAttribute('rotation', '0 0 0');
+            updatePhysics();
+        });
+
+        let lastTrailTime = 0;
+        function createTrailPoint(x, z) {
+            if (!showTrace) return;
+            const p = document.createElement('a-sphere');
+            p.setAttribute('position', `${x} 0 ${z}`); 
+            p.setAttribute('radius', '0.018');
+            p.setAttribute('color', '#a5b4fc');
+            p.setAttribute('opacity', '0.6');
+            trailContainer.appendChild(p);
+            setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, 2000); 
+        }
+
+        function drawGraph() {
+            if (bottomUi.classList.contains('collapsed')) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+
+            if (xHistory.length === 0) return;
+            ctx.strokeStyle = '#007bff';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            const step = canvas.width / maxHistoryLen;
+            for (let i = 0; i < xHistory.length; i++) {
+                const val = xHistory[i];
+                const canvasY = (canvas.height / 2) - (val * (canvas.height / 4.5)); 
+                const canvasX = canvas.width - (i * step);
+                if (i === 0) ctx.moveTo(canvasX, canvasY);
+                else ctx.lineTo(canvasX, canvasY);
+            }
+            ctx.stroke();
+        }
+
+        let lastTime = 0;
+        function animate(time) {
+            requestAnimationFrame(animate);
+            if (!lastTime) lastTime = time;
+            const dt = (time - lastTime) / 1000;
+            lastTime = time;
+
+            if (isPlaying && isLocked) {
+                theta += omega * dt;
+                const degree = (theta * 180 / Math.PI) % 360;
+                rotator.setAttribute('rotation', `0 ${degree} 0`);
+
+                const currentX = r * Math.cos(theta);
+                const currentZ = -r * Math.sin(theta);
+
+                // 単振動の青いボールをX軸上（Z=0, Y=-0.4）で同期往復させる
+                if (shadowBall) {
+                    shadowBall.setAttribute('position', `${currentX} -0.4 0`);
+                }
+
+                if (time - lastTrailTime > 50) {
+                    createTrailPoint(currentX, currentZ);
+                    lastTrailTime = time;
+                }
+
+                xHistory.unshift(currentX);
+                if (xHistory.length > maxHistoryLen) xHistory.pop();
+            }
+            drawGraph();
+        }
+
+        updatePhysics();
+        updateVisibility();
+        requestAnimationFrame(animate);
+    </script>
 </body>
 </html>
