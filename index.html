@@ -49,11 +49,40 @@
             100% { transform: rotate(-90deg); }
         }
 
-        /* 縦向き（Portrait）のときだけオーバーレイを表示 */
         @media screen and (orientation: portrait) {
-            #rotate-alert {
-                display: flex;
-            }
+            #rotate-alert { display: flex; }
+        }
+
+        /* 【新機能】画面中央のスキャン枠UI */
+        #scan-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none; /* 下のコントロールを邪魔しない */
+        }
+
+        #scan-reticle {
+            width: 260px;
+            height: 180px;
+            border: 3px dashed #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            transition: all 0.4s ease;
+            position: relative;
+        }
+
+        /* 平面認識成功時の黄緑点灯クラス */
+        #scan-reticle.detected {
+            border: 4px solid #7ecc49 !important;
+            box-shadow: 0 0 30px rgba(126, 204, 73, 0.6);
+            background: rgba(126, 204, 73, 0.05);
         }
 
         /* 状態案内UI */
@@ -62,7 +91,7 @@
             top: 80px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 123, 255, 0.9);
+            background: rgba(0, 123, 255, 0.95);
             color: white;
             padding: 10px 20px;
             border-radius: 25px;
@@ -76,7 +105,8 @@
             white-space: nowrap;
         }
         .status-locked {
-            background: rgba(40, 167, 69, 0.95) !important;
+            background: rgba(126, 204, 73, 0.95) !important;
+            color: #1a3a05 !important;
         }
 
         /* 数値表示パネル（右上） */
@@ -121,11 +151,7 @@
             color: #333;
             cursor: pointer;
         }
-        .control-item input {
-            margin-right: 6px;
-            width: 14px;
-            height: 14px;
-        }
+        .control-item input { margin-right: 6px; width: 14px; height: 14px; }
 
         /* 下部メインコントロールUI */
         #bottom-ui {
@@ -146,7 +172,6 @@
             overflow: hidden;
         }
 
-        /* 折りたたみ用ヘッダーエリア */
         #ui-header {
             display: flex;
             justify-content: space-between;
@@ -155,14 +180,8 @@
             border-bottom: 1px solid #eee;
             padding-bottom: 8px;
         }
+        #ui-title-text { font-size: 14px; font-weight: bold; color: #333; }
 
-        #ui-title-text {
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
-        }
-
-        /* 折りたたみ切り替えボタン */
         #btn-collapse {
             background: #e2e8f0;
             color: #4a5568;
@@ -171,38 +190,18 @@
             font-size: 11px;
             border-radius: 15px;
             cursor: pointer;
-            width: auto;
-            flex: none;
             font-weight: bold;
-            transition: all 0.2s;
-        }
-        #btn-collapse:hover {
-            background: #cbd5e1;
         }
 
-        /* コンテンツ部分 */
         #ui-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
-            transition: opacity 0.2s ease;
-            opacity: 1;
         }
 
-        /* 折りたたまれた状態のスタイル */
-        #bottom-ui.collapsed {
-            padding: 10px 15px;
-            max-height: 50px;
-        }
-        #bottom-ui.collapsed #ui-header {
-            margin-bottom: 0;
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-        #bottom-ui.collapsed #ui-content {
-            opacity: 0;
-            pointer-events: none;
-        }
+        #bottom-ui.collapsed { padding: 10px 15px; max-height: 50px; }
+        #bottom-ui.collapsed #ui-header { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+        #bottom-ui.collapsed #ui-content { opacity: 0; pointer-events: none; }
 
         .panel-title {
             font-size: 12px;
@@ -215,9 +214,7 @@
             margin-bottom: 8px;
         }
 
-        .slider-container {
-            margin-bottom: 8px;
-        }
+        .slider-container { margin-bottom: 8px; }
         .slider-meta {
             display: flex;
             justify-content: space-between;
@@ -226,16 +223,9 @@
             color: #333;
             margin-bottom: 2px;
         }
-        input[type="range"] {
-            width: 100%;
-            height: 5px;
-        }
+        input[type="range"] { width: 100%; height: 5px; }
 
-        .btn-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        }
+        .btn-row { display: flex; gap: 8px; margin-top: 8px; }
         button {
             flex: 1;
             padding: 8px;
@@ -247,32 +237,12 @@
             font-size: 12px;
             cursor: pointer;
         }
-        button:active { background: #0056b3; }
 
-        /* グラフ描画エリア */
-        .graph-box {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .graph-canvas-wrapper {
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            height: 90px;
-        }
-        canvas {
-            width: 100%;
-            height: 100%;
-        }
+        .graph-box { display: flex; flex-direction: column; justify-content: center; }
+        .graph-canvas-wrapper { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; height: 90px; }
+        canvas { width: 100%; height: 100%; }
 
-        a-scene {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
+        a-scene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
     </style>
 </head>
 <body>
@@ -281,11 +251,15 @@
         <div class="icon">🔄</div>
         <div style="font-size: 18px; margin-bottom: 8px;">画面を横向きにしてください</div>
         <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
-            このAR教材は、端末を横向きにすることで<br>実験操作パネルと3D空間を最適に表示します。
+            このAR教材は、端末を横向きにすることで最適な実験が行えます。
         </div>
     </div>
 
-    <div id="status-alert">📷 現実の机に向けて画面をタップし、円運動の中心軸をその場に完全固定</div>
+    <div id="scan-container">
+        <div id="scan-reticle"></div>
+    </div>
+
+    <div id="status-alert">⬜ 物体を固定する位置（机の平面）を中央の枠内に収めて画面をタップしてください</div>
 
     <div id="view-controls">
         <label class="control-item"><input type="checkbox" id="chk-r" checked> 半径ベクトル (橙)</label>
@@ -336,35 +310,37 @@
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
         
-        <a-entity id="ar-world" position="0 0 -1.4">
+        <a-entity id="ar-world" position="0 0 -1.5">
             
-            <a-cylinder radius="0.015" height="0.4" color="#64748b" position="0 0 0"></a-cylinder>
-            
-            <a-ring id="orbit-ring" color="#ffffff" rotation="-90 0 0" radius-inner="0.99" radius-outer="1.01" opacity="0.8"></a-ring>
-
-            <a-entity id="trail-container"></a-entity>
-
-            <a-entity id="rotator" rotation="0 0 0">
+            <a-entity id="floating-stage" position="0 0.3 0">
                 
-                <a-sphere id="physics-ball" position="1 0 0" radius="0.06" color="#ffffff"></a-sphere>
+                <a-cylinder radius="0.015" height="0.4" color="#64748b" position="0 -0.1 0"></a-cylinder>
+                
+                <a-ring id="orbit-ring" color="#ffffff" rotation="-90 0 0" radius-inner="0.99" radius-outer="1.01" opacity="0.8"></a-ring>
 
-                <a-entity id="group-v-r">
-                    <a-cylinder color="#ff9f43" radius="0.01" height="1" rotation="0 0 90" position="0.5 0 0"></a-cylinder>
+                <a-entity id="trail-container"></a-entity>
+
+                <a-entity id="rotator" rotation="0 0 0">
+                    <a-sphere id="physics-ball" position="1 0 0" radius="0.06" color="#ffffff"></a-sphere>
+
+                    <a-entity id="group-v-r">
+                        <a-cylinder color="#ff9f43" radius="0.01" height="1" rotation="0 0 90" position="0.5 0 0"></a-cylinder>
+                    </a-entity>
+
+                    <a-entity id="group-v-v" position="1 0 0">
+                        <a-cone color="#00d2d3" radius-bottom="0.025" radius-top="0" height="0.12" rotation="90 0 0" position="0 0 -0.4"></a-cone>
+                        <a-cylinder color="#00d2d3" radius="0.008" height="0.4" rotation="90 0 0" position="0 0 -0.2"></a-cylinder>
+                        <a-text value="v" color="#00d2d3" scale="0.35 0.35 0.35" position="0 0.12 -0.25" rotation="-30 0 0"></a-text>
+                    </a-entity>
+
+                    <a-entity id="group-v-a" position="1 0 0">
+                        <a-cone color="#ff6b6b" radius-bottom="0.025" radius-top="0" height="0.12" rotation="0 0 90" position="-0.4 0 0"></a-cone>
+                        <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.08 0 0"></a-cylinder>
+                        <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.26 0 0"></a-cylinder>
+                        <a-text value="a_c" color="#ff6b6b" scale="0.35 0.35 0.35" position="-0.25 0.12 0" rotation="-30 0 0"></a-text>
+                    </a-entity>
                 </a-entity>
-
-                <a-entity id="group-v-v" position="1 0 0">
-                    <a-cone color="#00d2d3" radius-bottom="0.025" radius-top="0" height="0.12" rotation="90 0 0" position="0 0 -0.4"></a-cone>
-                    <a-cylinder color="#00d2d3" radius="0.008" height="0.4" rotation="90 0 0" position="0 0 -0.2"></a-cylinder>
-                    <a-text value="v" color="#00d2d3" scale="0.35 0.35 0.35" position="0 0.12 -0.25" rotation="-30 0 0"></a-text>
-                </a-entity>
-
-                <a-entity id="group-v-a" position="1 0 0">
-                    <a-cone color="#ff6b6b" radius-bottom="0.025" radius-top="0" height="0.12" rotation="0 0 90" position="-0.4 0 0"></a-cone>
-                    <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.08 0 0"></a-cylinder>
-                    <a-cylinder color="#ff6b6b" radius="0.008" height="0.1" rotation="0 0 90" position="-0.26 0 0"></a-cylinder>
-                    <a-text value="a_c" color="#ff6b6b" scale="0.35 0.35 0.35" position="-0.25 0.12 0" rotation="-30 0 0"></a-text>
-                </a-entity>
-
+                
             </a-entity>
         </a-entity>
 
@@ -382,14 +358,17 @@
         const xHistory = [];
         const maxHistoryLen = 120;
 
-        // トラッキング用ジャイロ制御変数
+        // トラッキング・完全空間ピン留め用変数
         const lockedCameraRotation = new THREE.Quaternion();
         const currentDeviceRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-        let initialOffsetCalculated = false;
+        const finalWorldPosition = new THREE.Vector3(0, -0.6, -1.5); 
+        let lockedPitch = 0;
 
         // UI関係DOM
         const bottomUi = document.getElementById('bottom-ui');
         const btnCollapse = document.getElementById('btn-collapse');
+        const scanReticle = document.getElementById('scan-reticle');
+        const statusAlert = document.getElementById('status-alert');
 
         const sldR = document.getElementById('sld-r');
         const sldOmega = document.getElementById('sld-omega');
@@ -402,7 +381,6 @@
         const valT = document.getElementById('val-t');
         const btnToggle = document.getElementById('btn-toggle');
         const btnClear = document.getElementById('btn-clear');
-        const statusAlert = document.getElementById('status-alert');
         const chkR = document.getElementById('chk-r');
         const chkV = document.getElementById('chk-v');
         const chkA = document.getElementById('chk-a');
@@ -429,7 +407,6 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- 折りたたみ（縮小）制御イベント ---
         btnCollapse.addEventListener('click', () => {
             bottomUi.classList.toggle('collapsed');
             if (bottomUi.classList.contains('collapsed')) {
@@ -440,90 +417,82 @@
             }
         });
 
-        // スマホのジャイロセンサー情報のリアルタイム受信処理
+        // ジャイロセンサー取得
         window.addEventListener('deviceorientation', (event) => {
             if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
                 const alphaRad = THREE.MathUtils.degToRad(event.alpha);
                 const betaRad = THREE.MathUtils.degToRad(event.beta);
                 const gammaRad = THREE.MathUtils.degToRad(event.gamma);
-                
                 currentDeviceRotation.set(betaRad, alphaRad, -gammaRad);
             }
         }, true);
 
-        // --- タップによる「目の前に完全固定＆解除」ロジック ---
+        // --- 【修正】タップ時に枠内中心で位置を完全にロックする機構 ---
         window.addEventListener('click', (e) => {
             if (e.target.closest('#bottom-ui') || e.target.closest('#data-panel') || e.target.closest('#view-controls')) return;
 
-            // iOS等センサー解放用
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().catch(err => console.error(err));
             }
 
             if (!isLocked) {
+                // 1. タップした瞬間の端末の角度（クォータニオン）を保存
                 const currentQ = new THREE.Quaternion().setFromEuler(currentDeviceRotation);
                 lockedCameraRotation.copy(currentQ);
+                lockedPitch = currentDeviceRotation.x;
 
-                // 画面の中心位置に固定。Y軸(高さ)は起動時の傾きから算出した位置で固定
-                const currentPitch = currentDeviceRotation.x; // カメラの上下の傾き
-                const targetY = -1.4 * Math.sin(currentPitch);
-                const targetZ = -1.4 * Math.cos(currentPitch);
-
-                arWorld.object3D.position.set(0, targetY, targetZ);
+                // 2. 枠内の中心（カメラ正面1.5m先、少し下ろした位置）に空間の原点を固定
+                finalWorldPosition.set(0, -1.5 * Math.sin(lockedPitch), -1.5 * Math.cos(lockedPitch));
+                arWorld.object3D.position.copy(finalWorldPosition);
                 arWorld.object3D.rotation.set(0, 0, 0);
                 
+                // 3. UIの枠を黄緑に変え、テキストを更新
                 isLocked = true;
-                statusAlert.textContent = "📌 回転中心をその場に完全固定しました！ (再タップで解除)";
+                scanReticle.classList.add('detected');
+                statusAlert.textContent = "💚 平面認識成功！回転中心軸を固定しました（再タップでリセット）";
                 statusAlert.classList.add('status-locked');
             } else {
+                // 解除・リセット
                 isLocked = false;
-                statusAlert.textContent = "📷 現実の机に向けて画面をタップし、円運動の中心軸を固定";
+                scanReticle.classList.remove('detected');
+                statusAlert.textContent = "⬜ 物体を固定する位置（机の平面）を中央の枠内に収めて画面をタップしてください";
                 statusAlert.classList.remove('status-locked');
             }
         });
 
-        // 毎フレーム走る、カメラと世界の同期更新ループ
+        // カメラと世界の絶対位置同期ループ
         function updateCameraTracking() {
             const cameraObj = mainCamera.object3D;
             const currentQ = new THREE.Quaternion().setFromEuler(currentDeviceRotation);
 
             if (!isLocked) {
-                // 通常時：カメラをデバイスの傾きに追従させる
+                // ロック前：中央のファインダー枠内に常にオブジェクトの底面中心が一致するように投影
                 cameraObj.quaternion.copy(currentQ);
-
-                // 【初期配置センタリング】
-                // 起動時のデバイスの傾き（ピッチ方向）を取得し、視線の正面に常に回転軸がくるようにY軸とZ軸を自動マッピング
-                const currentPitch = currentDeviceRotation.x;
-                const targetY = -1.4 * Math.sin(currentPitch);
-                const targetZ = -1.4 * Math.cos(currentPitch);
-
-                arWorld.object3D.position.set(0, targetY, targetZ);
                 
-                // 回転平面（X-Z）が床と平行になるよう、世界の姿勢自体を水平に直す（傾きを相殺）
+                const currentPitch = currentDeviceRotation.x;
+                const targetY = -1.5 * Math.sin(currentPitch);
+                const targetZ = -1.5 * Math.cos(currentPitch);
+                
+                arWorld.object3D.position.set(0, targetY, targetZ);
+                // 平面が机に対して常に水平（床平行）になるよう、デバイスの傾きを相殺
                 arWorld.object3D.rotation.set(-currentPitch, 0, 0);
             } else {
-                // 固定時：カメラのみ自由に動き、世界はタップした座標にピン留め
+                // ロック後：カメラだけが自由に動き、世界（原点）はタップした絶対位置から1ミリも動かないように差分計算
                 cameraObj.quaternion.copy(currentQ);
 
                 const diffQ = new THREE.Quaternion().multiplyQuaternions(currentQ, lockedCameraRotation.clone().invert());
                 
-                // 固定時のピッチを基準にした位置関係を計算
-                const lockedPitch = new THREE.Euler().setFromQuaternion(lockedCameraRotation, 'YXZ').x;
-                const baseWorldPos = new THREE.Vector3(0, -1.4 * Math.sin(lockedPitch), -1.4 * Math.cos(lockedPitch));
+                const basePos = new THREE.Vector3(0, -1.5 * Math.sin(lockedPitch), -1.5 * Math.cos(lockedPitch));
+                basePos.applyQuaternion(diffQ);
+                arWorld.object3D.position.copy(basePos);
                 
-                baseWorldPos.applyQuaternion(diffQ);
-                arWorld.object3D.position.copy(baseWorldPos);
-                
-                // 世界の向きを、デバイスの動きと逆方向に回転させて水平状態をキープ
                 const invDiffQ = diffQ.clone().invert();
                 arWorld.object3D.quaternion.copy(invDiffQ);
-                
-                // 固定時も初期の水平状態を維持するための補正ピッチを適用
                 arWorld.object3D.rotateX(-lockedPitch);
             }
         }
 
-        // --- 物理パラメータとベクトルのリアルタイム伸縮ロジック ---
+        // --- 物理パラメータ更新ロジック ---
         function updatePhysics() {
             const v = r * omega;
             const ac = r * omega * omega;
@@ -545,14 +514,12 @@
             gR.querySelector('a-cylinder').setAttribute('height', r);
             gR.querySelector('a-cylinder').setAttribute('position', `${r / 2} 0 0`);
 
-            // 速度ベクトル（X-Z水平面に平行）
             gV.setAttribute('position', `${r} 0 0`);
             const vLength = Math.max(v * 0.2, 0.15);
             gV.querySelector('a-cylinder').setAttribute('height', vLength);
             gV.querySelector('a-cylinder').setAttribute('position', `0 0 ${-vLength / 2}`);
             gV.querySelector('a-cone').setAttribute('position', `0 0 ${-vLength}`);
 
-            // 向心加速度ベクトル（円の中心方向へ水平に伸びる）
             gA.setAttribute('position', `${r} 0 0`);
             const aLength = Math.max(ac * 0.1, 0.15);
             const cylinders = gA.querySelectorAll('a-cylinder');
@@ -591,28 +558,22 @@
             updatePhysics();
         });
 
-        // --- 光る軌跡(トレイル)の動的プロット ---
         let lastTrailTime = 0;
         function createTrailPoint(x, z) {
             if (!showTrace) return;
             const p = document.createElement('a-sphere');
-            p.setAttribute('position', `${x} 0 ${z}`);
+            p.setAttribute('position', `${x} 0 ${z}`); // 30cm浮いたローカル座標内で水平プロット
             p.setAttribute('radius', '0.02');
             p.setAttribute('color', '#a5b4fc');
             p.setAttribute('opacity', '0.8');
             trailContainer.appendChild(p);
 
-            setTimeout(() => {
-                if (p.parentNode) p.parentNode.removeChild(p);
-            }, 2500); 
+            setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, 2500); 
         }
 
-        // --- リアルタイム波形グラフ ---
         function drawGraph() {
             if (bottomUi.classList.contains('collapsed')) return;
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             ctx.strokeStyle = '#cccccc';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -621,28 +582,23 @@
             ctx.stroke();
 
             if (xHistory.length === 0) return;
-
             ctx.strokeStyle = '#007bff';
             ctx.lineWidth = 2.5;
             ctx.beginPath();
-
             const step = canvas.width / maxHistoryLen;
             for (let i = 0; i < xHistory.length; i++) {
                 const val = xHistory[i];
                 const canvasY = (canvas.height / 2) - (val * (canvas.height / 4.5)); 
                 const canvasX = canvas.width - (i * step);
-
                 if (i === 0) ctx.moveTo(canvasX, canvasY);
                 else ctx.lineTo(canvasX, canvasY);
             }
             ctx.stroke();
         }
 
-        // --- メインループ ---
         let lastTime = 0;
         function animate(time) {
             requestAnimationFrame(animate);
-
             if (!lastTime) lastTime = time;
             const dt = (time - lastTime) / 1000;
             lastTime = time;
@@ -665,7 +621,6 @@
                 xHistory.unshift(currentX);
                 if (xHistory.length > maxHistoryLen) xHistory.pop();
             }
-
             drawGraph();
         }
 
