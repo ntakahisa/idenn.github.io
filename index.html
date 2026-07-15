@@ -53,7 +53,7 @@
             #rotate-alert { display: flex; }
         }
 
-        /* 【新機能】画面中央のスキャン枠UI */
+        /* 画面中央のスキャン枠UI */
         #scan-container {
             position: fixed;
             top: 0;
@@ -65,48 +65,49 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            pointer-events: none; /* 下のコントロールを邪魔しない */
+            pointer-events: none; 
         }
 
         #scan-reticle {
-            width: 260px;
-            height: 180px;
-            border: 3px dashed #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-            transition: all 0.4s ease;
-            position: relative;
+            width: 280px;
+            height: 200px;
+            border: 4px dashed #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.4); 
+            transition: all 0.3s ease;
         }
 
-        /* 平面認識成功時の黄緑点灯クラス */
+        /* 平面を認識できたら黄緑に点灯 */
         #scan-reticle.detected {
-            border: 4px solid #7ecc49 !important;
-            box-shadow: 0 0 30px rgba(126, 204, 73, 0.6);
+            border: 5px solid #7ecc49 !important;
+            box-shadow: 0 0 30px rgba(126, 204, 73, 0.8), 0 0 0 4000px rgba(0, 0, 0, 0.1);
             background: rgba(126, 204, 73, 0.05);
         }
 
         /* 状態案内UI */
         #status-alert {
             position: absolute;
-            top: 80px;
+            top: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 123, 255, 0.95);
+            background: rgba(15, 23, 42, 0.85);
             color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 13px;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 14px;
             font-weight: bold;
             z-index: 100;
             text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
             pointer-events: none;
             transition: all 0.3s ease;
             white-space: nowrap;
+            border: 1px solid rgba(255,255,255,0.1);
         }
         .status-locked {
             background: rgba(126, 204, 73, 0.95) !important;
             color: #1a3a05 !important;
+            border: none;
         }
 
         /* 数値表示パネル（右上） */
@@ -259,7 +260,7 @@
         <div id="scan-reticle"></div>
     </div>
 
-    <div id="status-alert">⬜ 物体を固定する位置（机の平面）を中央の枠内に収めて画面をタップしてください</div>
+    <div id="status-alert">🔍 物体を固定する位置を枠内に収めて平面を認識してください</div>
 
     <div id="view-controls">
         <label class="control-item"><input type="checkbox" id="chk-r" checked> 半径ベクトル (橙)</label>
@@ -310,11 +311,12 @@
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
         
-        <a-entity id="ar-world" position="0 0 -1.5">
+        <a-marker type="pattern" url="https://raw.githack.com/AR-js-org/AR.js/master/data/data/patt.hiro" id="ar-marker">
             
             <a-entity id="floating-stage" position="0 0.3 0">
                 
-                <a-cylinder radius="0.015" height="0.4" color="#64748b" position="0 -0.1 0"></a-cylinder>
+                <a-cylinder radius="0.015" height="0.3" color="#64748b" position="0 -0.15 0"></a-cylinder>
+                <a-cone radius-bottom="0.04" radius-top="0.015" height="0.05" color="#475569" position="0 -0.3 0"></a-cone>
                 
                 <a-ring id="orbit-ring" color="#ffffff" rotation="-90 0 0" radius-inner="0.99" radius-outer="1.01" opacity="0.8"></a-ring>
 
@@ -342,13 +344,12 @@
                 </a-entity>
                 
             </a-entity>
-        </a-entity>
+        </a-marker>
 
-        <a-entity id="main-camera" camera></a-entity>
+        <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-        let isLocked = false;
         let r = 1.00;
         let omega = 2.00;
         let theta = 0;
@@ -357,12 +358,6 @@
         
         const xHistory = [];
         const maxHistoryLen = 120;
-
-        // トラッキング・完全空間ピン留め用変数
-        const lockedCameraRotation = new THREE.Quaternion();
-        const currentDeviceRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-        const finalWorldPosition = new THREE.Vector3(0, -0.6, -1.5); 
-        let lockedPitch = 0;
 
         // UI関係DOM
         const bottomUi = document.getElementById('bottom-ui');
@@ -387,7 +382,7 @@
         const chkTrace = document.getElementById('chk-trace');
 
         // 3DオブジェクトDOM
-        const arWorld = document.getElementById('ar-world');
+        const marker = document.getElementById('ar-marker');
         const rotator = document.getElementById('rotator');
         const ball = document.getElementById('physics-ball');
         const orbitRing = document.getElementById('orbit-ring');
@@ -395,7 +390,6 @@
         const gR = document.getElementById('group-v-r');
         const gV = document.getElementById('group-v-v');
         const gA = document.getElementById('group-v-a');
-        const mainCamera = document.getElementById('main-camera');
 
         // Canvas初期化
         const canvas = document.getElementById('graphCanvas');
@@ -417,82 +411,20 @@
             }
         });
 
-        // ジャイロセンサー取得
-        window.addEventListener('deviceorientation', (event) => {
-            if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-                const alphaRad = THREE.MathUtils.degToRad(event.alpha);
-                const betaRad = THREE.MathUtils.degToRad(event.beta);
-                const gammaRad = THREE.MathUtils.degToRad(event.gamma);
-                currentDeviceRotation.set(betaRad, alphaRad, -gammaRad);
-            }
-        }, true);
-
-        // --- 【修正】タップ時に枠内中心で位置を完全にロックする機構 ---
-        window.addEventListener('click', (e) => {
-            if (e.target.closest('#bottom-ui') || e.target.closest('#data-panel') || e.target.closest('#view-controls')) return;
-
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().catch(err => console.error(err));
-            }
-
-            if (!isLocked) {
-                // 1. タップした瞬間の端末の角度（クォータニオン）を保存
-                const currentQ = new THREE.Quaternion().setFromEuler(currentDeviceRotation);
-                lockedCameraRotation.copy(currentQ);
-                lockedPitch = currentDeviceRotation.x;
-
-                // 2. 枠内の中心（カメラ正面1.5m先、少し下ろした位置）に空間の原点を固定
-                finalWorldPosition.set(0, -1.5 * Math.sin(lockedPitch), -1.5 * Math.cos(lockedPitch));
-                arWorld.object3D.position.copy(finalWorldPosition);
-                arWorld.object3D.rotation.set(0, 0, 0);
-                
-                // 3. UIの枠を黄緑に変え、テキストを更新
-                isLocked = true;
-                scanReticle.classList.add('detected');
-                statusAlert.textContent = "💚 平面認識成功！回転中心軸を固定しました（再タップでリセット）";
-                statusAlert.classList.add('status-locked');
-            } else {
-                // 解除・リセット
-                isLocked = false;
-                scanReticle.classList.remove('detected');
-                statusAlert.textContent = "⬜ 物体を固定する位置（机の平面）を中央の枠内に収めて画面をタップしてください";
-                statusAlert.classList.remove('status-locked');
-            }
+        // 平面認識状態を検知してUIを黄緑に点灯させるイベント制御
+        marker.addEventListener('markerFound', () => {
+            scanReticle.classList.add('detected');
+            statusAlert.textContent = "🟢 平面認識成功！30cm上に回転体を固定しました";
+            statusAlert.classList.add('status-locked');
         });
 
-        // カメラと世界の絶対位置同期ループ
-        function updateCameraTracking() {
-            const cameraObj = mainCamera.object3D;
-            const currentQ = new THREE.Quaternion().setFromEuler(currentDeviceRotation);
+        marker.addEventListener('markerLost', () => {
+            scanReticle.classList.remove('detected');
+            statusAlert.textContent = "🔍 物体を固定する位置を枠内に収めて平面を認識してください";
+            statusAlert.classList.remove('status-locked');
+        });
 
-            if (!isLocked) {
-                // ロック前：中央のファインダー枠内に常にオブジェクトの底面中心が一致するように投影
-                cameraObj.quaternion.copy(currentQ);
-                
-                const currentPitch = currentDeviceRotation.x;
-                const targetY = -1.5 * Math.sin(currentPitch);
-                const targetZ = -1.5 * Math.cos(currentPitch);
-                
-                arWorld.object3D.position.set(0, targetY, targetZ);
-                // 平面が机に対して常に水平（床平行）になるよう、デバイスの傾きを相殺
-                arWorld.object3D.rotation.set(-currentPitch, 0, 0);
-            } else {
-                // ロック後：カメラだけが自由に動き、世界（原点）はタップした絶対位置から1ミリも動かないように差分計算
-                cameraObj.quaternion.copy(currentQ);
-
-                const diffQ = new THREE.Quaternion().multiplyQuaternions(currentQ, lockedCameraRotation.clone().invert());
-                
-                const basePos = new THREE.Vector3(0, -1.5 * Math.sin(lockedPitch), -1.5 * Math.cos(lockedPitch));
-                basePos.applyQuaternion(diffQ);
-                arWorld.object3D.position.copy(basePos);
-                
-                const invDiffQ = diffQ.clone().invert();
-                arWorld.object3D.quaternion.copy(invDiffQ);
-                arWorld.object3D.rotateX(-lockedPitch);
-            }
-        }
-
-        // --- 物理パラメータ更新ロジック ---
+        // 物理パラメータ更新ロジック
         function updatePhysics() {
             const v = r * omega;
             const ac = r * omega * omega;
@@ -562,13 +494,13 @@
         function createTrailPoint(x, z) {
             if (!showTrace) return;
             const p = document.createElement('a-sphere');
-            p.setAttribute('position', `${x} 0 ${z}`); // 30cm浮いたローカル座標内で水平プロット
-            p.setAttribute('radius', '0.02');
+            p.setAttribute('position', `${x} 0 ${z}`); 
+            p.setAttribute('radius', '0.015');
             p.setAttribute('color', '#a5b4fc');
-            p.setAttribute('opacity', '0.8');
+            p.setAttribute('opacity', '0.7');
             trailContainer.appendChild(p);
 
-            setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, 2500); 
+            setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, 2000); 
         }
 
         function drawGraph() {
@@ -603,9 +535,7 @@
             const dt = (time - lastTime) / 1000;
             lastTime = time;
 
-            updateCameraTracking();
-
-            if (isPlaying) {
+            if (isPlaying && marker.visible) {
                 theta += omega * dt;
                 const degree = (theta * 180 / Math.PI) % 360;
                 rotator.setAttribute('rotation', `0 ${degree} 0`);
@@ -613,7 +543,7 @@
                 const currentX = r * Math.cos(theta);
                 const currentZ = -r * Math.sin(theta);
 
-                if (time - lastTrailTime > 45) {
+                if (time - lastTrailTime > 50) {
                     createTrailPoint(currentX, currentZ);
                     lastTrailTime = time;
                 }
