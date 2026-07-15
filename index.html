@@ -1,50 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="utf-8">
-  <title>等速円運動シミュレータ（横から観察可能版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <title>等速円運動（マーカーロック・高精度復旧版）</title>
+  
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
+  
   <script>
-    // 一度マーカーを認識したら、その位置に世界座標でオブジェクトを固定するコンポーネント
+    // 確実な挙動を担保する「位置固定」コンポーネント
     AFRAME.registerComponent('world-lock', {
       init: function () {
-        this.marker = document.querySelector('a-marker');
+        this.marker = document.querySelector('#ar-marker');
         this.container = document.querySelector('#locked-container');
         this.hasLocked = false;
         
-        // 毎フレームの監視
-        this.el.sceneEl.addEventListener('tick', () => {
-          // マーカーが認識されており、まだ座標をロックしていない場合
-          if (this.marker.object3D.visible && !this.hasLocked) {
-            // マーカーの現在の世界座標と回転を取得
-            const worldPosition = new THREE.Vector3();
-            const worldQuaternion = new THREE.Quaternion();
-            const worldScale = new THREE.Vector3();
-            
-            this.marker.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
-            
-            // ロック用コンテナ（シーン直下）に座標をコピー
-            this.container.object3D.position.copy(worldPosition);
-            this.container.object3D.quaternion.copy(worldQuaternion);
-            
-            // オブジェクトを可視化
-            this.container.setAttribute('visible', 'true');
-            this.hasLocked = true;
-            
-            // 画面上にロック完了を通知（デバッグ用）
-            document.querySelector('#status').innerText = "位置をロックしました。マーカーから離れて横から観察できます！";
-            document.querySelector('#status').style.backgroundColor = "rgba(40, 167, 69, 0.8)";
-          }
+        // 念のためマーカーが確実に見つかった時のイベントを購読
+        this.marker.addEventListener('markerFound', () => {
+          this.lockPosition();
         });
+      },
+      tick: function () {
+        // バックアップ処理：イベントが発火しなくても、visibleがtrueになったら強制ロック
+        if (this.marker && this.marker.object3D.visible && !this.hasLocked) {
+          this.lockPosition();
+        }
+      },
+      lockPosition: function() {
+        if (this.hasLocked) return;
+        
+        const worldPosition = new THREE.Vector3();
+        const worldQuaternion = new THREE.Quaternion();
+        const worldScale = new THREE.Vector3();
+        
+        // マーカーの絶対座標を分解・保存
+        this.marker.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
+        
+        // マーカーの真上30cm (Y=0.3) を世界座標に設定
+        this.container.object3D.position.copy(worldPosition);
+        // マーカーと完全に同じ傾き（水平面）を同期
+        this.container.object3D.quaternion.copy(worldQuaternion);
+        
+        this.container.setAttribute('visible', 'true');
+        this.hasLocked = true;
+        
+        // UIの文字を切り替え
+        const statusEl = document.querySelector('#status');
+        if(statusEl) {
+          statusEl.innerText = "✨ 位置固定完了！マーカーを外して、横から回り込んでみてください！";
+          statusEl.style.backgroundColor = "rgba(40, 167, 69, 0.9)";
+        }
       }
     });
 
-    // 等速円運動と正弦波の動きを制御するアニメーション
+    // 物理シミュレーション駆動
     AFRAME.registerComponent('circular-motion', {
       schema: {
-        radius: {type: 'number', default: 1.5}, // 円運動の半径
-        speed: {type: 'number', default: 0.002} // 回転速度
+        radius: {type: 'number', default: 1.2},
+        speed: {type: 'number', default: 0.002}
       },
       init: function () {
         this.angle = 0;
@@ -52,70 +66,87 @@
       tick: function (time, timeDelta) {
         this.angle += this.data.speed * timeDelta;
         
-        // 円運動するボール（赤）の座標計算
         const x = this.data.radius * Math.cos(this.angle);
         const z = this.data.radius * Math.sin(this.angle);
-        this.el.setAttribute('position', {x: x, y: 0.5, z: z}); // Y軸は床から50cm浮かせる
         
-        // 横（X軸）の往復運動（単振動）を示す影や補助ライン用（青）
+        // ステージの真上（Y=0）で等速円運動
+        this.el.setAttribute('position', {x: x, y: 0, z: z});
+        
         const shadowBall = document.querySelector('#shadow-ball');
         if (shadowBall) {
-          shadowBall.setAttribute('position', {x: x, y: 0.1, z: 0});
+          shadowBall.setAttribute('position', {x: x, y: -0.4, z: 0});
         }
       }
     });
   </script>
+  
   <style>
     #status {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 10px;
-      background: rgba(220, 53, 69, 0.8);
+      top: 15px;
+      left: 15px;
+      right: 15px;
+      padding: 12px;
+      background: rgba(220, 53, 69, 0.9);
       color: white;
-      font-family: sans-serif;
-      font-size: 14px;
-      border-radius: 5px;
+      font-family: 'Helvetica Neue', sans-serif;
+      font-weight: bold;
+      font-size: 13px;
+      text-align: center;
+      border-radius: 8px;
       z-index: 999;
       pointer-events: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     button {
       position: absolute;
-      bottom: 20px;
+      bottom: 30px;
       left: 50%;
       transform: translateX(-50%);
-      padding: 12px 24px;
-      font-size: 16px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: bold;
       background-color: #007BFF;
       color: white;
       border: none;
-      border-radius: 5px;
+      border-radius: 30px;
       z-index: 999;
       cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,123,255,0.4);
     }
   </style>
 </head>
 
-<body style="margin: 0; overflow: hidden;">
-  <div id="status">マーカー（Hiro）をカメラに映して位置を固定してください</div>
+<body style="margin: 0; overflow: hidden; background: #000;">
   
-  <button onclick="location.reload();">位置をリセット</button>
+  <div id="status">📷 カメラをHiroマーカーに向けてください。ピタッと位置を固定します。</div>
+  
+  <button onclick="location.reload();">🔄 位置をリセット</button>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" world-lock>
     
-    <a-marker preset="hiro"></a-marker>
+    <a-marker id="ar-marker" preset="hiro" smooth="false"></a-marker>
 
     <a-entity id="locked-container" visible="false">
       
-      <a-grid limits="5" cell-size="0.5" color="#ccc" opacity="0.5"></a-grid>
+      <a-entity position="0 0.3 0">
+        
+        <a-cylinder radius="0.015" height="0.3" color="#64748b" position="0 -0.15 0"></a-cylinder>
+        <a-cone radius-bottom="0.04" radius-top="0.015" height="0.04" color="#475569" position="0 -0.3 0"></a-cone>
 
-      <a-ring color="#555" radius-inner="1.48" radius-outer="1.52" rotation="-90 0 0" position="0 0.5 0" opacity="0.6"></a-ring>
+        <a-ring color="#e2e8f0" radius-inner="1.18" radius-outer="1.22" rotation="-90 0 0" opacity="0.6"></a-ring>
 
-      <a-sphere id="main-ball" circular-motion="radius: 1.5; speed: 0.002" radius="0.15" color="#FF4136"></a-sphere>
+        <a-sphere radius="0.04" color="#475569"></a-sphere>
 
-      <a-sphere id="shadow-ball" radius="0.1" color="#0074D9" opacity="0.8"></a-sphere>
+        <a-entity circular-motion="radius: 1.2; speed: 0.002">
+          <a-sphere radius="0.12" color="#FF4136"></a-sphere>
+          <a-cylinder color="#ff9f43" radius="0.01" height="1.2" rotation="0 0 90" position="-0.6 0 0"></a-cylinder>
+        </a-entity>
 
-      <a-cylinder position="0 0.5 0" radius="0.01" height="3" rotation="0 0 90" color="#aaaaaa" opacity="0.4"></a-cylinder>
+        <a-cylinder color="#334155" radius="0.008" height="3.0" rotation="0 0 90" position="0 -0.4 0" opacity="0.5"></a-cylinder>
+        <a-sphere id="shadow-ball" radius="0.09" color="#0074D9" opacity="0.9"></a-sphere>
+
+      </a-entity>
 
     </a-entity>
 
