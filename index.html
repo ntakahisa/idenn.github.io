@@ -3,129 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>等速円運動と単振動 AR/3D物理教材</title>
-    
-    <script src="https://www.geogebra.org/apps/deployggb.js"></script>
-    
+    <title>3D等速円運動AR教材</title>
+    <script type="text/javascript" src="https://www.geogebra.org/apps/deployggb.js"></script>
     <style>
-        html, body {
+        body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
             font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f8fafc;
+            background-color: #f0f0f0;
         }
-
-        #app-container {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* ヘッダー部分 */
-        header {
-            background-color: #1e293b;
-            color: #ffffff;
-            padding: 12px 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            z-index: 10;
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        header p {
-            margin: 4px 0 0 0;
-            font-size: 11px;
-            color: #cbd5e1;
-        }
-
-        /* GeoGebraアプレットの表示エリア */
-        #ggb-element-wrapper {
-            flex: 1;
-            width: 100%;
-            position: relative;
-            background-color: #ffffff;
-        }
-
         #ggb-element {
             width: 100%;
             height: 100%;
         }
-
-        /* ガイド表示 */
-        #guide-panel {
-            background-color: #f1f5f9;
-            border-top: 1px solid #e2e8f0;
-            padding: 10px 16px;
-            font-size: 12px;
-            color: #334155;
-            line-height: 1.5;
-        }
-
-        .highlight {
-            font-weight: bold;
-            color: #2563eb;
+        /* AR起動を促す案内UI（必要に応じて調整してください） */
+        #ar-instruction {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 10;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <div id="app-container">
-        <header>
-            <h1>💡 等速円運動と単振動のAR/3Dシミュレーター</h1>
-            <p>※AR対応端末は、右下の「AR」ボタンを押すと現実の机の上に投影できます。</p>
-        </header>
-
-        <div id="ggb-element-wrapper">
-            <div id="ggb-element"></div>
-        </div>
-
-        <div id="guide-panel">
-            <strong>【学習のポイント】</strong><br>
-            1. スライダーで<span class="highlight">半径 r</span>や<span class="highlight">角速度 ω</span>を変更し、運動の変化を観察しよう。<br>
-            2. 画面をドラッグして<span class="highlight">真横から見る</span>と、赤い球（円運動）と青い球（単振動）の動きがどう重なるか確認しよう。
-        </div>
+    <div id="ggb-element"></div>
+    
+    <div id="ar-instruction">
+        右下の「ARボタン（三角とカメラのアイコン）」を押すと、AR空間にモデルが飛び出します！
     </div>
 
     <script>
-        // GeoGebra教材の設定パラメータ
-        // ※「m/8904791」はGeoGebra公式が提供する、等速円運動・単振動シミュレーションの公開ワークシートIDです。
-        // パラメータ、ベクトル表示トグル、リアルタイム正弦波グラフがすでに美しくデザインされています。
+        // GeoGebraパラメータの設定
         var parameters = {
-            "id": "ggbApplet",
-            "materialId": "pypnyggy", // 円運動と単振動の美しく使いやすい標準教材IDを指定
+            // ★ 作成していただいた専用マテリアルIDをここに完全適用しています
+            "materialId": "a5jcsdyw", 
+            
             "width": window.innerWidth,
-            "height": window.innerHeight - 120, // ヘッダーとフッターを引いた高さ
-            "showToolBar": false,
-            "showMenuBar": false,
-            "showAlgebraInput": false,
-            "allowStyleBar": false,
+            "height": window.innerHeight,
+            "showMenuBar": false,          // メニューバーを非表示（生徒の誤操作を防ぐ）
+            "showAlgebraInput": false,     // 数式入力バーを非表示
+            "showToolBar": false,          // ツールバーを非表示
+            "customToolBar": "0",
+            "showResetIcon": true,         // 右上にリセットボタンを表示
             "enableLabelDrags": false,
-            "enableShiftDragZoom": true, // ピンチイン・アウトでの拡大縮小を許可
+            "enableShiftDragZoom": true,   // 3D空間の回転・ズームを許可
             "enableRightClick": false,
-            "capturingThreshold": null,
-            "showHTML5": true,
+            "errorDialogsActive": false,
             "useBrowserForJS": true,
-            "borderColor": "#ffffff"
+            "allowStyleBar": false,
+            "preventFocus": false,
+            "showZoomButtons": false,
+            
+            // 3DおよびARを有効化する設定
+            "is3D": true,
+            "enable3D": true,
+            "enableAR": true               // モバイル端末でのAR起動ボタンを表示
         };
 
+        // 描画を実行する設定
         var applet = new GGBApplet(parameters, '5.0', 'ggb-element');
         
+        // ページ読み込み時に描画を開始
         window.onload = function() {
             applet.inject('ggb-element');
         };
 
-        // 画面サイズが変更されたらGeoGebraのサイズも追従させる
+        // 画面サイズが変更されたら、GeoGebraのサイズも自動調整
         window.addEventListener('resize', function() {
-            if (window.ggbApplet) {
-                window.ggbApplet.setSize(window.innerWidth, window.innerHeight - 120);
+            if (typeof ggbApplet !== "undefined") {
+                ggbApplet.setSize(window.innerWidth, window.innerHeight);
             }
         });
     </script>
